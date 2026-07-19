@@ -35,9 +35,9 @@ def _mvalue(x):
 
 def call_dmps(matrix: pd.DataFrame, groups: dict, min_delta=0.10,
               fdr=0.05, test="auto") -> pd.DataFrame:
-    """test: 'auto' (Welch t-test on M-values for small cohorts <8/group where the
-    Mann-Whitney p-floor is too high for FDR; Mann-Whitney otherwise), 'ttest', or
-    'mannwhitney'."""
+    """test: 'auto' (Welch t-test on M-values for cohorts <12/group, where the
+    Mann-Whitney asymptotic p-floor is too high to survive FDR; the Mann-Whitney
+    rank test for larger cohorts), 'ttest', or 'mannwhitney'."""
     cases = [s for s, g in groups.items() if g == "case" and s in matrix.columns]
     ctrls = [s for s, g in groups.items() if g == "control" and s in matrix.columns]
     if not cases or not ctrls:
@@ -47,7 +47,7 @@ def call_dmps(matrix: pd.DataFrame, groups: dict, min_delta=0.10,
     delta = np.nanmean(C, axis=1) - np.nanmean(K, axis=1)
     use = test
     if test == "auto":
-        use = "mannwhitney" if min(len(cases), len(ctrls)) >= 8 else "ttest"
+        use = "mannwhitney" if min(len(cases), len(ctrls)) >= 12 else "ttest"
     pvals = np.ones(len(matrix))
     for i in range(len(matrix)):
         a, b = C[i][~np.isnan(C[i])], K[i][~np.isnan(K[i])]

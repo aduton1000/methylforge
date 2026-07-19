@@ -1,0 +1,89 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+:root{--bg:#fff;--fg:#1a1d21;--muted:#6b7280;--card:#f7f8fa;--line:#e5e7eb;
+--blue:#0072B2;--green:#009E73;--red:#D55E00;--amber:#E69F00;}
+@media (prefers-color-scheme:dark){:root{--bg:#14171a;--fg:#e8eaed;--muted:#9aa0a6;--card:#1e2226;--line:#2c3136;}}
+:root[data-theme="dark"]{--bg:#14171a;--fg:#e8eaed;--muted:#9aa0a6;--card:#1e2226;--line:#2c3136;}
+:root[data-theme="light"]{--bg:#fff;--fg:#1a1d21;--muted:#6b7280;--card:#f7f8fa;--line:#e5e7eb;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
+font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:30px 22px 60px}
+header{border-bottom:3px solid var(--blue);padding-bottom:12px}
+h1{font-size:1.45rem;margin:0 0 2px}.sub{color:var(--muted);font-size:.9rem}
+.grid{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0}
+.tile{flex:1 1 140px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.tile .k{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-size:1.6rem;font-weight:700;margin-top:3px}
+.v.ok{color:var(--green)}.v.bad{color:var(--red)}
+h2{font-size:1.1rem;margin:26px 0 8px;border-left:4px solid var(--blue);padding-left:10px}
+img{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{border-bottom:1px solid var(--line);padding:7px 10px;text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{background:var(--card);position:sticky;top:0;cursor:pointer;user-select:none}
+th:hover{color:var(--blue)}
+tr:hover td{background:var(--card)}
+.badge{font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:11px;color:#fff}
+.badge.pass{background:var(--green)}.badge.review{background:var(--red)}
+td.bad{color:var(--red);font-weight:700;background:rgba(213,94,0,.08)}
+.note{color:var(--muted);font-size:.82rem;margin-top:8px}
+footer{margin-top:36px;color:var(--muted);font-size:.78rem;border-top:1px solid var(--line);padding-top:12px}
+</style></head><body><div class="wrap">
+<header>
+<h1>{{ title }}</h1>
+<div class="sub">MethylForge v{{ version }} · {{ n }} samples · generated {{ date }}</div>
+</header>
+
+<div class="grid">
+<div class="tile"><div class="k">Samples</div><div class="v">{{ n }}</div></div>
+<div class="tile"><div class="k">Passed QC</div><div class="v ok">{{ n_pass }}</div></div>
+<div class="tile"><div class="k">Flagged (review)</div><div class="v {{ 'bad' if n_review else 'ok' }}">{{ n_review }}</div></div>
+<div class="tile"><div class="k">Conversion gate</div><div class="v" style="font-size:1.1rem">≥{{ (gates.min_conversion*100)|round(0) }}%</div></div>
+<div class="tile"><div class="k">Coverage gate</div><div class="v" style="font-size:1.1rem">≥{{ gates.min_mean_cov|round(0) }}×</div></div>
+</div>
+
+<h2>Batch overview</h2>
+<img src="{{ figure }}" alt="cohort QC overview">
+
+<h2>Per-sample QC</h2>
+<div class="tblwrap"><table id="qc"><thead><tr>
+<th>Sample</th><th>QC</th><th>Conversion&nbsp;%</th><th>Mean&nbsp;cov&nbsp;×</th><th>Callable&nbsp;CpGs</th>
+<th>Global&nbsp;CpG&nbsp;%</th><th>λ&nbsp;conv&nbsp;%</th><th>pUC19&nbsp;over&nbsp;%</th><th>Sex</th></tr></thead><tbody>
+{% for r in rows %}
+<tr>
+<td>{{ r.sample }}</td>
+<td><span class="badge {{ 'pass' if r.qc_pass else 'review' }}">{{ 'PASS' if r.qc_pass else 'REVIEW' }}</span></td>
+<td class="{{ 'bad' if r.fail.conversion }}">{{ (r.conversion*100)|round(1) if r.conversion is not none else '—' }}</td>
+<td class="{{ 'bad' if r.fail.coverage }}">{{ r.mean_cov }}</td>
+<td class="{{ 'bad' if r.fail.callable }}">{{ "{:,}".format(r.callable) }}</td>
+<td>{{ (r.global_cpg_meth*100)|round(1) }}</td>
+<td>{{ (r.lambda_conversion*100)|round(1) if r.lambda_conversion is not none else '—' }}</td>
+<td class="{{ 'bad' if r.fail.overconversion }}">{{ (r.puc19_overconversion*100)|round(2) if r.puc19_overconversion is not none else '—' }}</td>
+<td>{{ r.inferred_sex }}</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+<div class="note">Red cells fail a gate. Gates: conversion ≥{{ (gates.min_conversion*100)|round(0) }}%, mean coverage ≥{{ gates.min_mean_cov|round(0) }}×, ≥{{ gates.min_cpg_callable }} callable CpGs, pUC19 retention ≥{{ (gates.min_puc19_meth*100)|round(0) }}%. Click a column header to sort.</div>
+
+<footer>MethylForge v{{ version }} · cohort QC dashboard · {{ date }}</footer>
+</div>
+<script>
+document.querySelectorAll('#qc th').forEach(function(th,ci){
+  th.addEventListener('click',function(){
+    var tb=th.closest('table').querySelector('tbody');
+    var rows=[].slice.call(tb.rows);
+    var asc=th._asc=!th._asc;
+    rows.sort(function(a,b){
+      var x=a.cells[ci].innerText.replace(/[,×%]/g,''), y=b.cells[ci].innerText.replace(/[,×%]/g,'');
+      var nx=parseFloat(x), ny=parseFloat(y);
+      if(!isNaN(nx)&&!isNaN(ny)) return asc?nx-ny:ny-nx;
+      return asc?x.localeCompare(y):y.localeCompare(x);
+    });
+    rows.forEach(function(r){tb.appendChild(r)});
+  });
+});
+</script>
+</body></html>

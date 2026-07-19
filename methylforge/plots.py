@@ -94,3 +94,60 @@ def qc_plot(meth, metrics) -> str:
         for s in ["top", "right"]:
             ax.spines[s].set_visible(False)
     return _b64(fig)
+
+
+def cohort_qc_figure(df, gates) -> str:
+    """Multi-panel batch overview (conversion, coverage, callable, global meth,
+    spike-ins, pass/fail) across all samples in a run."""
+    import pandas as _pd
+    n = len(df)
+    x = np.arange(n)
+    labels = df["sample"].tolist()
+    fig, axes = plt.subplots(2, 3, figsize=(13.5, 7.2))
+
+    def bars(ax, vals, title, thr=None, thr_lab=None, good="high", ylabel=""):
+        v = [0 if (x is None or (isinstance(x, float) and x != x)) else x for x in vals]
+        if thr is None:
+            cols = [BLUE] * n
+        else:
+            cols = [GREEN if ((val >= thr) if good == "high" else (val <= thr)) else RED for val in v]
+        ax.bar(x, v, color=cols, edgecolor=DARK, linewidth=0.5)
+        if thr is not None:
+            ax.axhline(thr, color=GREY, ls="--", lw=1, label=thr_lab)
+            ax.legend(fontsize=7, frameon=False)
+        ax.set_title(title, fontweight="bold", fontsize=10)
+        ax.set_xticks(x); ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=7)
+        ax.set_ylabel(ylabel, fontsize=8)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+
+    bars(axes[0, 0], [(v * 100 if v is not None and v == v else None) for v in df["conversion"]],
+         "Conversion efficiency (%)", gates["min_conversion"] * 100, f"≥{gates['min_conversion']*100:.0f}%", "high", "%")
+    bars(axes[0, 1], df["mean_cov"], "Mean CpG coverage (×)", gates["min_mean_cov"], f"≥{gates['min_mean_cov']:.0f}×", "high", "×")
+    bars(axes[0, 2], df["callable"], "Callable CpGs", gates["min_cpg_callable"], f"≥{gates['min_cpg_callable']}", "high")
+    bars(axes[1, 0], [(v * 100 if v is not None and v == v else 0) for v in df["global_cpg_meth"]],
+         "Global CpG methylation (%)", None, None, "high", "%")
+
+    ax = axes[1, 1]
+    lam = [(v * 100 if v is not None and v == v else 0) for v in df["lambda_conversion"]]
+    puc = [(v * 100 if v is not None and v == v else 0) for v in df["puc19_overconversion"]]
+    w = 0.4
+    ax.bar(x - w / 2, lam, w, color=GREEN, label="λ conversion", edgecolor=DARK, linewidth=0.5)
+    ax.bar(x + w / 2, puc, w, color=ORANGE, label="pUC19 over-conv.", edgecolor=DARK, linewidth=0.5)
+    ax.set_title("Spike-in controls (%)", fontweight="bold", fontsize=10)
+    ax.set_xticks(x); ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=7)
+    ax.legend(fontsize=7, frameon=False)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+
+    ax = axes[1, 2]
+    npass = int(df["qc_pass"].sum()); nrev = n - npass
+    ax.bar(["PASS", "REVIEW"], [npass, nrev], color=[GREEN, RED], edgecolor=DARK)
+    ax.set_title("QC outcome", fontweight="bold", fontsize=10)
+    for i, val in enumerate([npass, nrev]):
+        ax.text(i, val, str(val), ha="center", va="bottom", fontweight="bold")
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+
+    fig.tight_layout()
+    return _b64(fig)

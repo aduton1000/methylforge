@@ -119,6 +119,27 @@ def cmd_cohort(a):
         print(f"[methylforge] groups -> {a.groups_out}")
 
 
+def cmd_cohortqc(a):
+    import glob
+    from . import dashboard as edash, cohort as ecoh
+    if a.samplesheet:
+        paths, _ = ecoh.read_samplesheet(a.samplesheet)
+        df = edash.collect_qc(paths)
+    elif a.inputs:
+        df = edash.collect_qc(ecoh.paths_from_globs(a.inputs))
+    elif a.results:
+        rp = [f for pat in a.results for f in sorted(glob.glob(pat))]
+        df = edash.collect_from_results(rp)
+    else:
+        raise SystemExit("provide --samplesheet, --inputs, or --results")
+    edash.render_dashboard(df, a.out, title=a.title)
+    print(f"[methylforge] cohort QC dashboard ({len(df)} samples, "
+          f"{int(df['qc_pass'].sum())} pass / {int((~df['qc_pass']).sum())} review) -> {a.out}")
+    if a.summary_out:
+        edash.write_summary(df, a.summary_out)
+        print(f"[methylforge] summary -> {a.summary_out}")
+
+
 def cmd_testdata(a):
     from . import testdata
     testdata.generate(a.outdir)
@@ -189,6 +210,15 @@ def build_parser():
     co.add_argument("--min-samples-frac", type=float, default=0.75)
     co.add_argument("--context", default="CpG")
     co.set_defaults(func=cmd_cohort)
+
+    cq = sub.add_parser("cohort-qc", help="MultiQC-style batch QC dashboard across many samples")
+    cq.add_argument("--samplesheet", help="CSV: sample,methylation[,group]")
+    cq.add_argument("--inputs", nargs="*", help="methylation files/globs (sample = basename)")
+    cq.add_argument("--results", nargs="*", help="per-sample results.json files/globs (aggregate existing QC)")
+    cq.add_argument("--out", required=True, help="dashboard HTML")
+    cq.add_argument("--summary-out", help="write a summary TSV")
+    cq.add_argument("--title", default="MethylForge cohort QC")
+    cq.set_defaults(func=cmd_cohortqc)
 
     t = sub.add_parser("testdata"); t.add_argument("-o", "--outdir", default="methylforge_testdata")
     t.set_defaults(func=cmd_testdata)
