@@ -120,7 +120,7 @@ def generate_cohort(data_dir: str, n_case: int = 8, n_ctrl: int = 8) -> dict:
     positions) with one implanted hypermethylated DMR block and SNRPN hyper in
     cases — so `methylforge cohort` -> `methylforge dmr` can be shown end-to-end."""
     rng = np.random.default_rng(7)
-    bg = [(f"chr{1 + (i % 5)}", 2_000_000 + i * 80) for i in range(300)]   # shared null sites
+    bg = [(f"chr{1 + (i % 5)}", 2_000_000 + i * 80) for i in range(1200)]   # shared null sites
     bg_base = rng.uniform(0.1, 0.9, len(bg))
     dmr_block = [("chr8", 7_000_000 + i * 60) for i in range(12)]           # implanted DMR
     panel = eio.read_dmr_panel()
@@ -129,7 +129,7 @@ def generate_cohort(data_dir: str, n_case: int = 8, n_ctrl: int = 8) -> dict:
     cdir = os.path.join(data_dir, "cohort")
     os.makedirs(cdir, exist_ok=True)
 
-    def write_sample(name, is_case):
+    def write_sample(name, is_case, bad_conversion=False):
         rec = []
         for (c, p), b in zip(bg, bg_base):
             rec.append((c, p, float(np.clip(b + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
@@ -137,6 +137,13 @@ def generate_cohort(data_dir: str, n_case: int = 8, n_ctrl: int = 8) -> dict:
             rec.append((c, p, float(np.clip((0.85 if is_case else 0.30) + rng.normal(0, 0.04), 0, 1)), 30, "CpG"))
         for (c, p) in snrpn_cpgs:
             rec.append((c, p, float(np.clip((0.95 if is_case else 0.50) + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
+        lam = 0.10 if bad_conversion else 0.005   # one sample: poor bisulfite conversion
+        for _ in range(200):
+            rec.append(("NC_001416.1", int(rng.integers(1, 48502)),
+                        float(np.clip(rng.normal(lam, 0.01), 0, 0.4)), 30, "CHH"))
+        for _ in range(50):
+            rec.append(("L09137.1", int(rng.integers(1, 2686)),
+                        float(np.clip(rng.normal(0.98, 0.01), 0.9, 1.0)), 30, "CpG"))
         path = os.path.join(cdir, f"{name}.methyl.tsv")
         _write_native(rec, path)
         return path
@@ -146,7 +153,7 @@ def generate_cohort(data_dir: str, n_case: int = 8, n_ctrl: int = 8) -> dict:
         p = write_sample(f"case{i+1}", True)
         rows.append((f"case{i+1}", os.path.relpath(p, data_dir), "case"))
     for i in range(n_ctrl):
-        p = write_sample(f"ctrl{i+1}", False)
+        p = write_sample(f"ctrl{i+1}", False, bad_conversion=(i == n_ctrl - 1))
         rows.append((f"ctrl{i+1}", os.path.relpath(p, data_dir), "control"))
     ss = os.path.join(data_dir, "cohort_samplesheet.csv")
     pd.DataFrame(rows, columns=["sample", "methylation", "group"]).to_csv(ss, index=False)

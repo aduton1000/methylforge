@@ -59,6 +59,13 @@ def test_all():
     cdmrs = edmr.merge_dmrs(edmr.call_dmps(cmat, cgroups))
     assert (cdmrs.direction == "hyper").sum() >= 2, "cohort DMR should recover implanted signals"
 
+    # cohort QC dashboard — should flag the conversion-outlier control and render
+    from methylforge import dashboard as edash
+    qdf = edash.collect_qc(cpaths)
+    assert (~qdf["qc_pass"]).sum() >= 1, "dashboard should flag the conversion outlier"
+    dash_html = edash.render_dashboard(qdf, os.path.join(tmp, "cohort_qc.html"))
+    assert os.path.getsize(dash_html) > 50000, "dashboard HTML should embed the overview figure"
+
     # episignature reference builder — leave-one-out CV on clean data should be strong
     bundle = eepi.build_reference(ref, labels, per_class_n=12, min_delta=0.15)
     assert bundle["metrics"]["accuracy"] >= 0.8, "episignature LOOCV accuracy should be high"

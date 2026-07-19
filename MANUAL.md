@@ -109,11 +109,25 @@ site only if covered in this fraction of samples, default 0.75), `--sites` (feat
 `chrom:pos`), `--region-bed`, `--context` (default CpG). The output feeds straight into
 `methylforge dmr` (with the groups TSV) or episignature reference building.
 
+### `methylforge cohort-qc` — MultiQC-style batch QC dashboard
+Aggregates per-sample QC across a whole run into one self-contained HTML: a batch summary,
+overview plots (conversion, coverage, callable CpGs, global methylation, spike-in controls,
+pass/fail), and a **sortable** per-sample table with pass/fail badges and red-flagged failing
+cells.
+```bash
+# run QC on many samples from a samplesheet (or globs), and/or aggregate existing results.json
+methylforge cohort-qc --samplesheet cohort_samplesheet.csv --out cohort_qc.html --summary-out cohort_qc.tsv
+methylforge cohort-qc --inputs 'meth/*.cov' --out cohort_qc.html
+methylforge cohort-qc --results 'out/*/*.results.json' --out cohort_qc.html
+```
+Samples that fail any gate (conversion, coverage, callable CpGs, pUC19 over-conversion) are
+flagged **REVIEW** with the offending cell highlighted, so a whole batch is eyeballed at once.
+
 ### `methylforge dmr` — cohort differential methylation
 ```bash
 methylforge dmr --matrix matrix.tsv --groups groups.tsv [--genes-bed genes.bed]
 ```
-DMP test selection is automatic: Welch t-test on M-values for small cohorts (<8 per group,
+DMP test selection is automatic: Welch t-test on M-values for small cohorts (<12 per group,
 where the Mann-Whitney p-floor is too high to survive FDR) and the Mann-Whitney rank test
 for larger cohorts.
 
