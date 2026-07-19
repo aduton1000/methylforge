@@ -20,3 +20,6 @@ epiforge_out/
 *.swp
 .idea/
 .vscode/
+
+# Downloaded reference databases (not source; see _local/refs/PROVENANCE.md)
+_local/

@@ -108,3 +108,119 @@ def classify(query: pd.Series, centroids: pd.DataFrame,
                 method=method, interpretation=interp,
                 probabilities={k: round(v, 3) for k, v in probs.items()},
                 n_features_used=int(mask.sum()), **extra)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reference builder — feature selection + leave-one-out validation
+# ─────────────────────────────────────────────────────────────────────────────
+import os as _os
+import json as _json
+from scipy import stats as _stats
+from . import dmr as _dmr
+
+
+def select_features(matrix: pd.DataFrame, labels: dict, control_class="Control",
+                    per_class_n=40, min_delta=0.15, alpha=0.05) -> tuple[dict, list]:
+    """Per non-control class, select the most discriminative CpGs vs controls
+    (|Δβ| >= min_delta AND M-value Welch-t p < alpha), top `per_class_n` by |Δβ|.
+    Returns ({class: [features]}, combined_feature_list)."""
+    ctrl = [s for s, l in labels.items() if l == control_class and s in matrix.columns]
+    if not ctrl:
+        raise ValueError(f"no samples of control class '{control_class}'")
+    K = matrix[ctrl].to_numpy(float)
+    sig = {}
+    for cls in sorted(set(labels.values())):
+        if cls == control_class:
+            continue
+        cs = [s for s, l in labels.items() if l == cls and s in matrix.columns]
+        C = matrix[cs].to_numpy(float)
+        delta = np.nanmean(C, axis=1) - np.nanmean(K, axis=1)
+        p = np.ones(len(matrix))
+        for i in range(len(matrix)):
+            a, b = C[i][~np.isnan(C[i])], K[i][~np.isnan(K[i])]
+            if len(a) >= 2 and len(b) >= 2:
+                try:
+                    p[i] = _stats.ttest_ind(_dmr._mvalue(a), _dmr._mvalue(b), equal_var=False).pvalue
+                except Exception:
+                    p[i] = 1.0
+        mask = (np.abs(delta) >= min_delta) & (p < alpha)
+        order = np.argsort(-np.abs(delta * mask))
+        feats = [matrix.index[i] for i in order if mask[i]][:per_class_n]
+        sig[cls] = feats
+    combined = sorted({f for fs in sig.values() for f in fs})
+    return sig, combined
+
+
+def _metrics(y_true, y_pred, classes):
+    labs = sorted(set(classes))
+    cols = labs + ["inconclusive"]
+    conf = {t: {p: 0 for p in cols} for t in labs}
+    for t, p in zip(y_true, y_pred):
+        conf[t][p if p in cols else "inconclusive"] += 1
+    per = {}
+    for c in labs:
+        tp = conf[c][c]
+        fn = sum(v for p, v in conf[c].items() if p != c)
+        fp = sum(conf[t][c] for t in labs if t != c)
+        tn = sum(conf[t][p] for t in labs for p in cols if t != c and p != c)
+        per[c] = dict(n=tp + fn,
+                      sensitivity=round(tp / (tp + fn), 3) if (tp + fn) else None,
+                      specificity=round(tn / (tn + fp), 3) if (tn + fp) else None,
+                      tp=tp, fn=fn, fp=fp)
+    acc = sum(1 for t, p in zip(y_true, y_pred) if t == p) / max(len(y_true), 1)
+    return dict(accuracy=round(acc, 3), n=len(y_true), classes=labs,
+                per_class=per, confusion=conf)
+
+
+def cross_validate(matrix: pd.DataFrame, labels: dict, control_class="Control",
+                   per_class_n=40, min_delta=0.15, alpha=0.05) -> dict:
+    """Nested leave-one-out CV: features are re-selected on each training fold
+    (no leakage), the held-out sample is classified, metrics are aggregated."""
+    samples = [s for s in matrix.columns if s in labels]
+    y_true, y_pred = [], []
+    for held in samples:
+        train = [s for s in samples if s != held]
+        tl = {s: labels[s] for s in train}
+        try:
+            _, feats = select_features(matrix[train], tl, control_class, per_class_n, min_delta, alpha)
+            if not feats:
+                y_true.append(labels[held]); y_pred.append("inconclusive"); continue
+            cent = build_centroids(matrix.loc[feats, train], tl)
+            res = classify(matrix.loc[feats, held], cent, matrix.loc[feats, train], tl)
+            y_pred.append(res["call"])
+        except Exception:
+            y_pred.append("inconclusive")
+        y_true.append(labels[held])
+    return _metrics(y_true, y_pred, [labels[s] for s in samples])
+
+
+def build_reference(matrix: pd.DataFrame, labels: dict, control_class="Control",
+                    per_class_n=40, min_delta=0.15, alpha=0.05, validate=True) -> dict:
+    sig, feats = select_features(matrix, labels, control_class, per_class_n, min_delta, alpha)
+    ref_matrix = matrix.loc[feats]
+    centroids = build_centroids(ref_matrix, labels)
+    metrics = cross_validate(matrix, labels, control_class, per_class_n, min_delta, alpha) if validate else None
+    return dict(features=feats, signatures=sig, ref_matrix=ref_matrix,
+                labels=labels, centroids=centroids, control_class=control_class,
+                params=dict(per_class_n=per_class_n, min_delta=min_delta, alpha=alpha),
+                metrics=metrics)
+
+
+def save_reference(bundle: dict, outdir: str) -> dict:
+    """Persist a reference bundle. reference_matrix.tsv + labels.tsv are drop-in
+    for `methylforge run --episign-ref/--episign-labels`."""
+    _os.makedirs(outdir, exist_ok=True)
+    rm = _os.path.join(outdir, "reference_matrix.tsv")
+    bundle["ref_matrix"].to_csv(rm, sep="\t")
+    lab = _os.path.join(outdir, "labels.tsv")
+    pd.DataFrame({"sample": list(bundle["labels"]), "class": list(bundle["labels"].values())}).to_csv(lab, sep="\t", index=False)
+    bundle["centroids"].to_csv(_os.path.join(outdir, "centroids.tsv"), sep="\t")
+    with open(_os.path.join(outdir, "signatures.json"), "w") as fh:
+        _json.dump(bundle["signatures"], fh, indent=2)
+    with open(_os.path.join(outdir, "manifest.json"), "w") as fh:
+        _json.dump({"control_class": bundle["control_class"], "params": bundle["params"],
+                    "n_features": len(bundle["features"]),
+                    "classes": sorted(set(bundle["labels"].values())),
+                    "metrics": bundle["metrics"]}, fh, indent=2)
+    return dict(reference_matrix=rm, labels=lab,
+                manifest=_os.path.join(outdir, "manifest.json"))
