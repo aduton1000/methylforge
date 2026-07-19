@@ -1,11 +1,14 @@
 #!/usr/bin/env nextflow
-// MethylForge — main entry.
-// Usage:
-//   nextflow run main.nf -profile local,conda --samplesheet samples.csv --reference genome.fa
-//   nextflow run main.nf -profile test,conda           (synthetic fixture; analysis+report only)
+// MethylForge — main entry. Select a mode with --mode:
+//   --mode sequencing  (default) short/long/precalled -> analysis + reports + batch QC
+//   --mode array       Illumina EPIC/450K IDAT -> beta (minfi) -> analysis + reports
+//   --mode cohort_qc   batch QC dashboard only, from a samplesheet of methylation files
+// e.g. nextflow run main.nf -profile local,conda --mode array --idat_dir DIR --array_sheet s.csv
 nextflow.enable.dsl = 2
 
 include { METHYLFORGE } from './subworkflows/methylforge.nf'
+include { ARRAY_INGEST; ARRAY_TO_METHYL } from './modules/stage0_array.nf'
+include { COHORT_QC } from './modules/stage5_cohort_qc.nf'
 
 def parse_row(row) {
   def meta = [ id: row.sample,
@@ -18,21 +21,37 @@ def parse_row(row) {
   return tuple(meta, files)
 }
 
-workflow {
-  if (params.test_mode) {
-    // fixture: generate synthetic precalled methylation then analyse+report
-    log.info "MethylForge TEST fixture — generating synthetic methylation and running analysis+report."
-  }
-  if (!params.samplesheet) { error "Provide --samplesheet (CSV: sample,fastq_1,fastq_2,read_type,modbam,methylation,group)" }
-
-  samples = Channel.fromPath(params.samplesheet)
-                   .splitCsv(header: true)
-                   .map { parse_row(it) }
+// ── sequencing / precalled ────────────────────────────────────────────────
+workflow sequencing {
+  if (!params.samplesheet) error "provide --samplesheet (sample,fastq_1,fastq_2,read_type,modbam,methylation,group)"
+  samples = Channel.fromPath(params.samplesheet).splitCsv(header: true).map { parse_row(it) }
   genome  = params.reference ? file(params.reference) : file("${projectDir}/assets/NO_FILE")
-
   METHYLFORGE(samples, genome)
 }
 
-workflow.onComplete {
-  log.info "MethylForge complete → ${params.outdir}  (ok=${workflow.success})"
+// ── array: IDAT -> beta (minfi) -> per-sample methylation -> analysis ──────
+workflow array {
+  if (!params.idat_dir || !params.array_sheet)
+    error "array mode needs --idat_dir and --array_sheet (minfi sample sheet)"
+  ARRAY_INGEST(file(params.idat_dir), file(params.array_sheet))
+  ARRAY_TO_METHYL(ARRAY_INGEST.out.beta, ARRAY_INGEST.out.manifest)
+  samples = ARRAY_TO_METHYL.out.methyl.flatten()
+      .map { f -> tuple([id: f.getBaseName().replaceAll(/\.methyl$/, ''),
+                         read_type: 'precalled', group: 'NA'], [methylation: f]) }
+  METHYLFORGE(samples, file("${projectDir}/assets/NO_FILE"))
+}
+
+// ── cohort_qc: batch QC dashboard only ────────────────────────────────────
+workflow cohort_qc {
+  if (!params.samplesheet) error "cohort_qc mode needs --samplesheet (sample,methylation)"
+  meth = Channel.fromPath(params.samplesheet).splitCsv(header: true)
+                .map { file(it.methylation) }.collect()
+  COHORT_QC(meth)
+}
+
+// ── dispatch ──────────────────────────────────────────────────────────────
+workflow {
+  if      (params.mode == 'array')     { array() }
+  else if (params.mode == 'cohort_qc') { cohort_qc() }
+  else                                 { sequencing() }
 }

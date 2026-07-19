@@ -5,6 +5,7 @@ include { ALIGN_SHORT }    from '../modules/stage2_align_short.nf'
 include { ALIGN_LONG }     from '../modules/stage2_align_long.nf'
 include { EXTRACT }        from '../modules/stage3_extract.nf'
 include { ANALYSE_REPORT } from '../modules/stage4_analysis_report.nf'
+include { COHORT_QC }      from '../modules/stage5_cohort_qc.nf'
 
 workflow METHYLFORGE {
   take:
@@ -31,6 +32,10 @@ workflow METHYLFORGE {
                     .mix(pre_ch)
 
     ANALYSE_REPORT(methylation)
+
+    // batch QC dashboard across all samples in the run
+    if (params.cohort_qc)
+        COHORT_QC(methylation.map { s, f -> f }.collect())
 
   emit:
     reports = ANALYSE_REPORT.out.out

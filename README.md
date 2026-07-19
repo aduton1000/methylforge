@@ -47,17 +47,27 @@ This produces branded clinical + research HTML reports and FamilyForge exports, 
 
 ## Run on real data (Nextflow)
 
+Select a mode with `--mode` (the classic-DSL2 modules use Nextflow's v1 language parser — `export NXF_SYNTAX_PARSER=v1` once per shell):
+
 ```bash
-# short-read bisulfite/EM-seq or long-read, driven by a sample sheet
-nextflow run main.nf -profile local,conda \
+export NXF_SYNTAX_PARSER=v1
+
+# sequencing (default): short/long/precalled -> analysis + reports + auto batch QC dashboard
+nextflow run main.nf -profile local,conda --mode sequencing \
   --samplesheet samples.csv --reference GRCh38.fa \
   --episign_ref ref/episig_reference.tsv --episign_labels ref/episig_labels.tsv
 
+# array: Illumina EPIC/450K IDAT -> beta (minfi) -> analysis + reports
+nextflow run main.nf -profile local,conda --mode array --idat_dir idats/ --array_sheet minfi_sheet.csv
+
+# cohort_qc: batch QC dashboard only, from a samplesheet of methylation files
+nextflow run main.nf -profile local,conda --mode cohort_qc --samplesheet methyl_sheet.csv
+
 # on the HPC
-nextflow run main.nf -profile hpc_slurm,singularity --samplesheet samples.csv --reference GRCh38.fa
+nextflow run main.nf -profile hpc_slurm,singularity --mode sequencing --samplesheet samples.csv --reference GRCh38.fa
 ```
 
-`samples.csv`: `sample,fastq_1,fastq_2,read_type,modbam,methylation,group` — `read_type` ∈ `short|long|precalled`.
+`samples.csv`: `sample,fastq_1,fastq_2,read_type,modbam,methylation,group` — `read_type` ∈ `short|long|precalled`. Every `sequencing`/`array` run also emits a **batch QC dashboard** (`cohort_qc.html`) aggregating all samples (disable with `--cohort_qc false`).
 
 See the full [**MANUAL**](MANUAL.md) for every command, stage, resource, and best-practice note.
 

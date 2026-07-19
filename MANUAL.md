@@ -175,11 +175,19 @@ methylforge testdata -o mf_demo
 ## 5. Nextflow usage
 
 ```bash
-nextflow run main.nf -profile <exec>,<pkg> --samplesheet samples.csv --reference genome.fa [options]
+export NXF_SYNTAX_PARSER=v1     # the classic-DSL2 modules use Nextflow's v1 parser
+nextflow run main.nf -profile <exec>,<pkg> --mode <mode> [options]
 ```
-Profiles: exec ∈ `local|hpc_slurm`; pkg ∈ `conda|mamba|docker|singularity|apptainer`. Key params: `--targets` (targeted BED), `--library bisulfite|emseq`, `--aligner bismark|bwameth`, `--episign_ref/--episign_labels`, `--run_dmr --dmr_matrix --dmr_groups`, `--genes_bed`, `--report_modes`, `--max_cpus/--max_memory`.
+Profiles: exec ∈ `local|hpc_slurm`; pkg ∈ `conda|mamba|docker|singularity|apptainer`.
 
-The `test` profile runs the analysis+report engine on the synthetic fixture (no aligners needed): `nextflow run main.nf -profile test,conda`.
+**Entry modes (`--mode`):**
+- `sequencing` (default) — short/long/precalled methylation → per-sample analysis + reports, then an automatic batch QC dashboard. Needs `--samplesheet` (+ `--reference` for FASTQ/modBAM input).
+- `array` — Illumina EPIC/450K: `--idat_dir` + `--array_sheet` (minfi sample sheet) → beta matrix (minfi funnorm) → per-sample methylation → the same analysis + reports.
+- `cohort_qc` — batch QC dashboard only, from `--samplesheet` (`sample,methylation`).
+
+Key params: `--targets` (targeted BED), `--library bisulfite|emseq`, `--aligner bismark|bwameth`, `--episign_ref/--episign_labels`, `--run_dmr --dmr_matrix --dmr_groups`, `--genes_bed`, `--report_modes`, `--cohort_qc true|false` (batch dashboard), `--max_cpus/--max_memory`.
+
+Every `sequencing`/`array` run also writes `${outdir}/cohort_qc.html` aggregating all samples. The `test` profile runs the analysis+report engine on the synthetic fixture (no aligners): `nextflow run main.nf -profile test,conda`.
 
 ---
 
