@@ -26,8 +26,18 @@ def _bh_fdr(p: np.ndarray) -> np.ndarray:
     return out
 
 
+def _mvalue(x):
+    """logit / M-value transform (respects the bounded 0..1 beta scale; the standard
+    for parametric methylation differential testing, cf. limma/methylKit)."""
+    x = np.clip(x, 1e-3, 1 - 1e-3)
+    return np.log2(x / (1 - x))
+
+
 def call_dmps(matrix: pd.DataFrame, groups: dict, min_delta=0.10,
-              fdr=0.05) -> pd.DataFrame:
+              fdr=0.05, test="auto") -> pd.DataFrame:
+    """test: 'auto' (Welch t-test on M-values for small cohorts <8/group where the
+    Mann-Whitney p-floor is too high for FDR; Mann-Whitney otherwise), 'ttest', or
+    'mannwhitney'."""
     cases = [s for s, g in groups.items() if g == "case" and s in matrix.columns]
     ctrls = [s for s, g in groups.items() if g == "control" and s in matrix.columns]
     if not cases or not ctrls:
@@ -35,15 +45,18 @@ def call_dmps(matrix: pd.DataFrame, groups: dict, min_delta=0.10,
     C = matrix[cases].to_numpy(float)
     K = matrix[ctrls].to_numpy(float)
     delta = np.nanmean(C, axis=1) - np.nanmean(K, axis=1)
+    use = test
+    if test == "auto":
+        use = "mannwhitney" if min(len(cases), len(ctrls)) >= 8 else "ttest"
     pvals = np.ones(len(matrix))
     for i in range(len(matrix)):
         a, b = C[i][~np.isnan(C[i])], K[i][~np.isnan(K[i])]
         if len(a) >= 1 and len(b) >= 1 and (len(a) + len(b)) >= 3:
             try:
-                if len(a) >= 2 and len(b) >= 2:
+                if use == "mannwhitney" and len(a) >= 2 and len(b) >= 2:
                     pvals[i] = stats.mannwhitneyu(a, b, alternative="two-sided").pvalue
                 else:
-                    pvals[i] = stats.ttest_ind(a, b, equal_var=False).pvalue
+                    pvals[i] = stats.ttest_ind(_mvalue(a), _mvalue(b), equal_var=False).pvalue
             except Exception:
                 pvals[i] = 1.0
     q = _bh_fdr(pvals)

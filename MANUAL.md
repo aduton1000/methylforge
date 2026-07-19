@@ -94,10 +94,28 @@ methylforge qc SAMPLE.cov
 methylforge imprinting SAMPLE.cov [--panel my_panel.tsv]
 ```
 
+### `methylforge cohort` — build a feature × sample matrix from many samples
+Turns a set of per-sample methylation files into the `feature × sample` beta matrix
+that the DMR and episignature stages consume.
+```bash
+# from a samplesheet (sample,methylation[,group]) — also writes groups.tsv
+methylforge cohort --samplesheet cohort_samplesheet.csv --out matrix.tsv --groups-out groups.tsv
+# or from globs; restrict to episignature features or a targeted region
+methylforge cohort --inputs 'meth/*.cov' --sites episig_features.txt --out episig_matrix.tsv
+methylforge cohort --samplesheet ss.csv --region-bed panel.bed --out targeted_matrix.tsv --groups-out groups.tsv
+```
+Options: `--min-cov` (per-site coverage filter, default 5), `--min-samples-frac` (keep a
+site only if covered in this fraction of samples, default 0.75), `--sites` (feature list
+`chrom:pos`), `--region-bed`, `--context` (default CpG). The output feeds straight into
+`methylforge dmr` (with the groups TSV) or episignature reference building.
+
 ### `methylforge dmr` — cohort differential methylation
 ```bash
 methylforge dmr --matrix matrix.tsv --groups groups.tsv [--genes-bed genes.bed]
 ```
+DMP test selection is automatic: Welch t-test on M-values for small cohorts (<8 per group,
+where the Mann-Whitney p-floor is too high to survive FDR) and the Mann-Whitney rank test
+for larger cohorts.
 
 ### `methylforge episign` — episignature classification
 ```bash

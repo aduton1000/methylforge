@@ -70,6 +70,24 @@ def cmd_episign(a):
     _p(eepi.classify(q, centroids, ref, labels))
 
 
+def cmd_cohort(a):
+    from . import cohort as ecoh
+    if a.samplesheet:
+        paths, groups = ecoh.read_samplesheet(a.samplesheet)
+    elif a.inputs:
+        paths, groups = ecoh.paths_from_globs(a.inputs), {}
+    else:
+        raise SystemExit("provide --samplesheet or --inputs")
+    sites = ecoh._load_sites(a.sites) if a.sites else None
+    mat = ecoh.build_matrix(paths, min_cov=a.min_cov, min_samples_frac=a.min_samples_frac,
+                            sites=sites, region_bed=a.region_bed, context=a.context)
+    mat.to_csv(a.out, sep="\t")
+    print(f"[methylforge] matrix {mat.shape[0]} features x {mat.shape[1]} samples -> {a.out}")
+    if groups and a.groups_out:
+        ecoh.write_groups(groups, a.groups_out)
+        print(f"[methylforge] groups -> {a.groups_out}")
+
+
 def cmd_testdata(a):
     from . import testdata
     testdata.generate(a.outdir)
@@ -109,6 +127,18 @@ def build_parser():
     e = sub.add_parser("episign"); e.add_argument("--reference", required=True)
     e.add_argument("--labels", required=True); e.add_argument("--query", required=True)
     e.set_defaults(func=cmd_episign)
+
+    co = sub.add_parser("cohort", help="build a feature x sample methylation matrix from many samples")
+    co.add_argument("--samplesheet", help="CSV: sample,methylation[,group]")
+    co.add_argument("--inputs", nargs="*", help="methylation files/globs (sample = basename)")
+    co.add_argument("--out", required=True)
+    co.add_argument("--groups-out", help="write sample,group TSV (needs group column)")
+    co.add_argument("--sites", help="restrict to a feature list (chrom:pos, or chrom<TAB>pos)")
+    co.add_argument("--region-bed", help="restrict to regions (targeted panel)")
+    co.add_argument("--min-cov", type=int, default=5)
+    co.add_argument("--min-samples-frac", type=float, default=0.75)
+    co.add_argument("--context", default="CpG")
+    co.set_defaults(func=cmd_cohort)
 
     t = sub.add_parser("testdata"); t.add_argument("-o", "--outdir", default="methylforge_testdata")
     t.set_defaults(func=cmd_testdata)
