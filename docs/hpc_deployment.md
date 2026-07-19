@@ -43,6 +43,7 @@ Create `/opt/lab/pipelines/methylforge/bin/methylforge-run`:
 #!/usr/bin/env bash
 set -euo pipefail
 module load nextflow singularity 2>/dev/null || true
+export NXF_SYNTAX_PARSER=v1   # classic-DSL2 modules
 export NXF_SINGULARITY_CACHEDIR=/opt/lab/singularity_cache
 REPO=/opt/lab/pipelines/methylforge
 REF=/opt/lab/refs/GRCh38.full.fa

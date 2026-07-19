@@ -15,3 +15,18 @@ process ARRAY_INGEST {
   Rscript ${projectDir}/bin/epic_process.R ${idat_dir} ${sheet} epic_beta.tsv epic_qc.txt
   """
 }
+
+// Convert the EPIC beta matrix (+manifest) into per-sample MethylForge methylation
+// files, so array samples flow through the identical downstream as sequencing.
+process ARRAY_TO_METHYL {
+  tag "epic"
+  label 'analysis'
+  publishDir "${params.outdir}/array/methyl", mode: 'copy'
+  input:  path beta
+          path manifest
+  output: path "methyl/*.methyl.tsv", emit: methyl
+  script:
+  """
+  methylforge array --beta ${beta} --manifest ${manifest} --out-methyl-dir methyl
+  """
+}
