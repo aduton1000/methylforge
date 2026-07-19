@@ -30,11 +30,17 @@ workflow sequencing {
 }
 
 // ── array: IDAT -> beta (minfi) -> per-sample methylation -> analysis ──────
+//   from IDATs:            --idat_dir DIR --array_sheet sheet.csv
+//   from a pre-made beta:  --array_beta beta.tsv --array_manifest manifest.tsv (skips the R step)
 workflow array {
-  if (!params.idat_dir || !params.array_sheet)
-    error "array mode needs --idat_dir and --array_sheet (minfi sample sheet)"
-  ARRAY_INGEST(file(params.idat_dir), file(params.array_sheet))
-  ARRAY_TO_METHYL(ARRAY_INGEST.out.beta, ARRAY_INGEST.out.manifest)
+  if (params.array_beta && params.array_manifest) {
+    ARRAY_TO_METHYL(file(params.array_beta), file(params.array_manifest))
+  } else {
+    if (!params.idat_dir || !params.array_sheet)
+      error "array mode needs --idat_dir + --array_sheet, or --array_beta + --array_manifest"
+    ARRAY_INGEST(file(params.idat_dir), file(params.array_sheet))
+    ARRAY_TO_METHYL(ARRAY_INGEST.out.beta, ARRAY_INGEST.out.manifest)
+  }
   samples = ARRAY_TO_METHYL.out.methyl.flatten()
       .map { f -> tuple([id: f.getBaseName().replaceAll(/\.methyl$/, ''),
                          read_type: 'precalled', group: 'NA'], [methylation: f]) }

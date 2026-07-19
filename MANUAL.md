@@ -182,7 +182,7 @@ Profiles: exec ∈ `local|hpc_slurm`; pkg ∈ `conda|mamba|docker|singularity|ap
 
 **Entry modes (`--mode`):**
 - `sequencing` (default) — short/long/precalled methylation → per-sample analysis + reports, then an automatic batch QC dashboard. Needs `--samplesheet` (+ `--reference` for FASTQ/modBAM input).
-- `array` — Illumina EPIC/450K: `--idat_dir` + `--array_sheet` (minfi sample sheet) → beta matrix (minfi funnorm) → per-sample methylation → the same analysis + reports.
+- `array` — Illumina EPIC/450K. Either from raw IDATs (`--idat_dir` + `--array_sheet`, or `--array_sheet auto` to use a sample sheet inside the IDAT dir) → beta matrix via minfi (funnorm; noob for a single sample) with hg38 coordinates via sesame (`--array_genome hg38|hg19`); **or** from a pre-computed matrix (`--array_beta beta.tsv --array_manifest manifest.tsv`, skipping the R step). Then per-sample methylation → the same analysis + reports. The IDAT→beta step needs the R env (`env/array.yml`); validate it on the cluster with `bash test/test_array_hpc.sh` (uses minfi's bundled example IDATs — no patient data).
 - `cohort_qc` — batch QC dashboard only, from `--samplesheet` (`sample,methylation`).
 
 Key params: `--targets` (targeted BED), `--library bisulfite|emseq`, `--aligner bismark|bwameth`, `--episign_ref/--episign_labels`, `--run_dmr --dmr_matrix --dmr_groups`, `--genes_bed`, `--report_modes`, `--cohort_qc true|false` (batch dashboard), `--max_cpus/--max_memory`.

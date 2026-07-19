@@ -75,7 +75,20 @@ Build the Bismark index once (`bismark_genome_preparation <dir>`); MethylForge r
 
 ## 8. Validation on the cluster
 ```bash
+export NXF_SYNTAX_PARSER=v1
 nextflow run main.nf -profile test,singularity     # synthetic fixture, analysis+report only
 python tests/selftest.py                            # asserts expected calls
 ```
-Both should pass before running patient data.
+
+**Array (IDAT→beta) step** — validate on the cluster with minfi's bundled example
+IDATs (no patient data needed), using the array R env:
+```bash
+mamba env create -f env/array.yml && conda activate methylforge-array
+pip install -e .                                    # so `methylforge` is on PATH
+bash test/test_array_hpc.sh                          # IDAT -> beta -> per-sample methylation
+```
+This runs `bin/epic_process.R` on `minfiData`'s example 450K arrays and pushes the
+result through `methylforge array` — confirming the whole array path works on your
+cluster before you process real EPIC data.
+
+All should pass before running patient data.
