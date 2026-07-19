@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MethylForge report — {{ sample }}</title>
+<style>
+:root{--bg:#ffffff;--fg:#1a1d21;--muted:#6b7280;--card:#f7f8fa;--line:#e5e7eb;
+--blue:#0072B2;--green:#009E73;--red:#D55E00;--amber:#E69F00;--pur:#CC79A7;}
+@media (prefers-color-scheme:dark){:root{--bg:#14171a;--fg:#e8eaed;--muted:#9aa0a6;--card:#1e2226;--line:#2c3136;}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
+font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.55}
+.wrap{max-width:960px;margin:0 auto;padding:32px 22px 60px}
+header{border-bottom:3px solid var(--blue);padding-bottom:14px;margin-bottom:8px}
+h1{font-size:1.5rem;margin:0 0 2px}h2{font-size:1.15rem;margin:30px 0 10px;border-left:4px solid var(--blue);padding-left:10px}
+.sub{color:var(--muted);font-size:.9rem}
+.mode{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+padding:3px 9px;border-radius:20px;background:var(--blue);color:#fff;margin-left:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .k{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-size:1.25rem;font-weight:700;margin-top:3px}
+.banner{border-radius:12px;padding:16px 18px;margin:16px 0;font-size:1.02rem;border:1px solid var(--line)}
+.banner.abnormal{background:rgba(213,94,0,.10);border-color:var(--red)}
+.banner.positive{background:rgba(213,94,0,.10);border-color:var(--red)}
+.banner.normal{background:rgba(0,158,115,.10);border-color:var(--green)}
+.banner.control-like{background:rgba(0,158,115,.10);border-color:var(--green)}
+.banner.inconclusive{background:rgba(230,159,0,.10);border-color:var(--amber)}
+.banner b{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+table{border-collapse:collapse;width:100%;font-size:.86rem;margin:10px 0}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left}
+th{background:var(--card);font-weight:600}
+tr td .pill{font-size:.74rem;font-weight:700;padding:2px 8px;border-radius:12px}
+.hyper{background:rgba(213,94,0,.15);color:var(--red)}.hypo{background:rgba(0,114,178,.15);color:var(--blue)}
+.norm{background:rgba(0,158,115,.15);color:var(--green)}.nc{background:rgba(153,153,153,.2);color:var(--muted)}
+img{max-width:100%;border:1px solid var(--line);border-radius:8px;margin:8px 0;background:#fff}
+.pass{color:var(--green);font-weight:700}.fail{color:var(--red);font-weight:700}
+.note{background:var(--card);border-left:4px solid var(--amber);padding:10px 14px;border-radius:6px;font-size:.85rem;color:var(--muted);margin:16px 0}
+footer{margin-top:40px;color:var(--muted);font-size:.78rem;border-top:1px solid var(--line);padding-top:12px}
+code{background:var(--card);padding:1px 5px;border-radius:4px;font-size:.85em}
+</style></head>
+<body><div class="wrap">
+<header>
+<h1>MethylForge methylation report <span class="mode">{{ mode }}</span></h1>
+<div class="sub">Sample <b>{{ sample }}</b> · assay {{ assay }} · {{ genome }} · MethylForge v{{ version }} · generated {{ date }}</div>
+</header>
+
+{% if headline %}
+<div class="banner {{ headline_class }}"><b>Overall interpretation</b>{{ headline }}</div>
+{% endif %}
+
+<h2>1 · Quality control</h2>
+<div class="grid">
+<div class="tile"><div class="k">QC status</div><div class="v">{% if qc.qc_pass %}<span class="pass">PASS</span>{% else %}<span class="fail">REVIEW</span>{% endif %}</div></div>
+<div class="tile"><div class="k">Mean CpG coverage</div><div class="v">{{ qc.mean_cpg_coverage }}×</div></div>
+<div class="tile"><div class="k">Conversion</div><div class="v">{{ (qc.conversion_efficiency*100)|round(1) if qc.conversion_efficiency else "n/a" }}%</div></div>
+<div class="tile"><div class="k">Callable CpGs</div><div class="v">{{ "{:,}".format(qc.n_cpg_callable) }}</div></div>
+<div class="tile"><div class="k">Global CpG meth.</div><div class="v">{{ (qc.global_cpg_methylation*100)|round(1) }}%</div></div>
+<div class="tile"><div class="k">Inferred sex</div><div class="v" style="font-size:.95rem">{{ qc.inferred_sex.split(' ')[0] }}</div></div>
+</div>
+{% if qc_plot %}<img src="{{ qc_plot }}" alt="QC plots">{% endif %}
+<div class="sub">Conversion estimated from {{ qc.conversion_source }}. Gates: coverage ≥{{ qc.gates.min_mean_cov }}×, conversion ≥{{ (qc.gates.min_conversion*100)|round(0) }}%, ≥{{ qc.gates.min_cpg_callable }} callable CpGs.</div>
+
+<h2>2 · Imprinting-disorder analysis</h2>
+<div class="banner {{ imprint_summary.severity }}"><b>Imprinting</b>{{ imprint_summary.headline }}</div>
+{% if imprint_plot %}<img src="{{ imprint_plot }}" alt="Imprinting">{% endif %}
+<table><tr><th>Locus</th><th>Gene</th><th>Beta</th><th>Δ vs normal</th><th>CpGs</th><th>Call</th><th>Associated disorder</th></tr>
+{% for r in imprinting %}
+<tr><td>{{ r.locus }}</td><td><i>{{ r.gene }}</i></td>
+<td>{{ r.observed_beta if r.observed_beta is not none else "—" }}</td>
+<td>{{ r.delta if r.delta is not none else "—" }}</td><td>{{ r.n_cpg }}</td>
+<td><span class="pill {{ {'hypermethylation':'hyper','hypomethylation':'hypo','normal':'norm','no_call':'nc'}[r.call] }}">{{ r.call }}</span></td>
+<td>{{ r.disorder }}</td></tr>
+{% endfor %}</table>
+
+{% if episign %}
+<h2>3 · Episignature classification</h2>
+<div class="banner {{ episign.verdict }}"><b>Episignature — {{ episign.verdict }}</b>{{ episign.interpretation }}</div>
+{% if episign_plot %}<img src="{{ episign_plot }}" alt="Episignature">{% endif %}
+<div class="sub">Method: {{ episign.method }} · features used: {{ episign.n_features_used }} · top class <b>{{ episign.top_class }}</b> (p={{ episign.probability }}, margin {{ episign.margin }}).</div>
+{% endif %}
+
+{% if mode == 'research' and dmr_summary %}
+<h2>4 · Differential methylation (research)</h2>
+<div class="banner normal"><b>DMR summary</b>{{ dmr_summary.headline }}</div>
+{% if dmr_volcano %}<img src="{{ dmr_volcano }}" alt="Volcano">{% endif %}
+{% if dmrs is not none and dmrs|length > 0 %}
+<table><tr><th>#</th><th>Region</th><th>Width</th><th>CpGs</th><th>Direction</th><th>Mean Δ</th><th>min q</th><th>Gene</th></tr>
+{% for r in dmrs %}
+<tr><td>{{ loop.index }}</td><td>{{ r.chrom }}:{{ r.start }}-{{ r.end }}</td><td>{{ r.width }}</td><td>{{ r.n_cpg }}</td>
+<td><span class="pill {{ 'hyper' if r.direction=='hyper' else 'hypo' }}">{{ r.direction }}</span></td>
+<td>{{ r.mean_delta }}</td><td>{{ "%.2g"|format(r.min_qvalue) }}</td><td><i>{{ r.nearest_gene }}</i></td></tr>
+{% endfor %}</table>
+{% else %}<div class="sub">No DMRs passed thresholds.</div>{% endif %}
+{% endif %}
+
+{% if mode == 'clinical' %}
+<div class="note"><b>Clinical note.</b> This report is a research-grade analysis and must be interpreted by a qualified professional alongside the clinical picture, orthogonal confirmation, and — for episignatures — a locally-validated, ancestry-appropriate reference. Panel coordinates and thresholds require local validation before diagnostic use. Findings of uncertain significance should not direct irreversible management.</div>
+{% endif %}
+
+<footer>
+MethylForge v{{ version }} · organism/disease-agnostic epigenome pipeline · {{ date }}.<br>
+Provenance: {{ provenance }}
+</footer>
+</div></body></html>

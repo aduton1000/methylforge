@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "methylforge"
+version = "0.1.0"
+description = "MethylForge — reproducible epigenome (DNA-methylation) analysis pipeline: short/long-read, genome-wide/targeted, imprinting + episignature + DMR, with a clinical/research report engine."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "aduton1000" }]
+keywords = ["epigenome", "methylation", "bisulfite", "nanopore", "episignature", "imprinting", "DMR", "nextflow"]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "scipy>=1.10",
+  "matplotlib>=3.7",
+  "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+ml = ["scikit-learn>=1.3"]          # enables the SVM episignature back-end
+dev = ["pytest>=7"]
+
+[project.scripts]
+methylforge = "methylforge.cli:main"
+
+[tool.setuptools]
+packages = ["methylforge"]
+
+[tool.setuptools.package-data]
+methylforge = ["resources/*.tsv", "resources/assets/*.png", "report_templates/*.j2"]

@@ -1,0 +1,124 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>GBCF methylation report — {{ sample }}</title>
+<style>
+:root{--navy:#16305e;--gold:#c9a24b;--ink:#1c2530;--muted:#5b6470;--line:#d8dde4;--soft:#f4f7fb;--soft2:#eef3f9;
+/* ACMG / variant-severity convention: P=red, LP=orange->red, VUS=amber, LB/B=green */
+--sev-p:#c0392b;--sev-lp:#e2683a;--sev-vus:#e0a415;--sev-b:#2e8b57;}
+@page{size:A4;margin:15mm 15mm 16mm 15mm;}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+body{font:11.5px/1.55 Arial,Helvetica,"Segoe UI",sans-serif;color:var(--ink);margin:0;background:#fff;}
+.wrap{max-width:186mm;margin:0 auto;padding:14px 4px 40px;}
+.doc-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid var(--gold);padding-bottom:8px;margin-bottom:6px;}
+.doc-header .logos{display:flex;align-items:center;gap:14px;}
+.doc-header img{height:40px;display:block;}
+.doc-header .meta{text-align:right;font-size:8.6px;color:var(--muted);line-height:1.45;}
+h1{font-size:18px;color:var(--navy);margin:8px 0 1px;line-height:1.2;}
+.subtitle{color:var(--muted);font-size:11px;margin:0 0 8px;}
+.ids{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:10px;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:7px 12px;margin:8px 0 4px;}
+.ids b{color:var(--navy);}
+h2{font-size:13.5px;color:var(--navy);border-bottom:1px solid var(--line);padding-bottom:3px;margin:16px 0 6px;}
+p,li{margin:3px 0;} table{border-collapse:collapse;width:100%;margin:6px 0;font-size:10px;}
+th,td{border:1px solid var(--line);padding:4px 7px;text-align:left;vertical-align:top;}
+th{background:var(--soft2);color:var(--navy);}
+.result-banner{border-radius:8px;padding:11px 14px;margin:10px 0;border-left:6px solid var(--navy);background:var(--soft);}
+.result-banner .lab{font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px;}
+.result-banner .txt{font-size:12.5px;font-weight:bold;color:var(--navy);}
+.result-banner.sev-p{border-left-color:var(--sev-p);background:rgba(192,57,43,.06);}
+.result-banner.sev-lp{border-left-color:var(--sev-lp);background:rgba(226,104,58,.06);}
+.result-banner.sev-vus{border-left-color:var(--sev-vus);background:rgba(224,164,21,.08);}
+.result-banner.sev-b{border-left-color:var(--sev-b);background:rgba(46,139,87,.06);}
+.pill{font-size:8.6px;font-weight:bold;padding:2px 8px;border-radius:11px;color:#fff;white-space:nowrap;}
+.pill.sev-p{background:var(--sev-p);} .pill.sev-lp{background:var(--sev-lp);}
+.pill.sev-vus{background:var(--sev-vus);color:#3a2c00;} .pill.sev-b{background:var(--sev-b);}
+.pill.sev-none{background:#9aa0a6;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:9px;color:var(--muted);margin:2px 0 6px;}
+.legend span{display:inline-flex;align-items:center;gap:5px;} .legend i{width:11px;height:11px;border-radius:3px;display:inline-block;}
+.grid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}
+.tile{flex:1 1 120px;background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:8px 10px;}
+.tile .k{font-size:8.4px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+.tile .v{font-size:14px;font-weight:bold;color:var(--navy);margin-top:2px;}
+.pass{color:var(--sev-b);} .review{color:var(--sev-p);}
+img.fig{max-width:100%;border:1px solid var(--line);border-radius:6px;margin:6px 0;}
+.disclaimer{border-left:3px solid var(--gold);background:var(--soft);margin:12px 0;padding:7px 12px;font-size:9.4px;color:#333;}
+.sign{display:flex;justify-content:space-between;gap:30px;margin-top:18px;font-size:10px;}
+.sign .box{flex:1;border-top:1px solid var(--ink);padding-top:4px;color:var(--muted);}
+.doc-footer{margin-top:14px;border-top:1px solid var(--line);padding-top:6px;font-size:8px;color:var(--muted);}
+</style></head><body><div class="wrap">
+
+<div class="doc-header">
+  <div class="logos">
+    <img src="{{ logo_noguchi }}" alt="Noguchi Memorial Institute for Medical Research">
+    <img src="{{ logo_gbcf }}" alt="Genomics &amp; Bioinformatics Core Facility">
+  </div>
+  <div class="meta">Genomics &amp; Bioinformatics Core Facility<br>Noguchi Memorial Institute for Medical Research<br>University of Ghana, Legon · {{ date }}</div>
+</div>
+
+<h1>Clinical epigenetic (DNA-methylation) report</h1>
+<div class="subtitle">MethylForge v{{ version }} · {{ assay }} · reference {{ genome }}</div>
+
+<div class="ids">
+  <div><b>Case / sample:</b> {{ sample }}</div>
+  <div><b>Family:</b> {{ family }}</div>
+  <div><b>Assay:</b> {{ assay }}</div>
+  <div><b>Report date:</b> {{ date }}</div>
+</div>
+
+<div class="result-banner {{ headline_sev }}">
+  <div class="lab">Overall interpretation</div>
+  <div class="txt">{{ headline }}</div>
+</div>
+<div class="legend">
+  <span><i style="background:var(--sev-p)"></i>Pathogenic</span>
+  <span><i style="background:var(--sev-lp)"></i>Likely pathogenic</span>
+  <span><i style="background:var(--sev-vus)"></i>Uncertain (VUS)</span>
+  <span><i style="background:var(--sev-b)"></i>Benign / normal</span>
+</div>
+
+<h2>1 · Result summary</h2>
+<table><tr><th>Finding</th><th>Locus / class</th><th>Observation</th><th>Associated condition</th><th>Classification</th></tr>
+{% for f in findings %}
+<tr><td>{{ f.type }}</td><td>{{ f.locus }}</td><td>{{ f.obs }}</td><td>{{ f.disorder or "—" }}</td>
+<td><span class="pill sev-{{ f.sev }}">{{ f.sev_label }}</span></td></tr>
+{% endfor %}
+{% if findings|length == 0 %}<tr><td colspan="5">No abnormal methylation finding.</td></tr>{% endif %}
+</table>
+
+<h2>2 · Imprinted-locus methylation</h2>
+<img class="fig" src="{{ imprint_plot }}" alt="Imprinting">
+<table><tr><th>Locus</th><th>Gene</th><th>Beta</th><th>Δ</th><th>CpGs</th><th>Call</th><th>Condition</th><th>Class</th></tr>
+{% for r in imprinting %}
+<tr><td>{{ r.locus }}</td><td><i>{{ r.gene }}</i></td>
+<td>{{ r.observed_beta if r.observed_beta is not none else "—" }}</td>
+<td>{{ r.delta if r.delta is not none else "—" }}</td><td>{{ r.n_cpg }}</td>
+<td>{{ r.call }}</td><td>{{ r.disorder }}</td>
+<td><span class="pill sev-{{ r._sev }}">{{ r._sev_label }}</span></td></tr>
+{% endfor %}</table>
+
+{% if episign %}
+<h2>3 · Episignature classification</h2>
+<div class="result-banner {{ episign._sev }}"><div class="lab">Episignature — {{ episign.verdict }}</div>
+<div class="txt" style="font-size:11px;font-weight:normal">{{ episign.interpretation }}</div></div>
+<img class="fig" src="{{ episign_plot }}" alt="Episignature">
+<div class="subtitle">Method: {{ episign.method }} · features used {{ episign.n_features_used }} · top class <b>{{ episign.top_class }}</b> (p={{ episign.probability }}, margin {{ episign.margin }}).</div>
+{% endif %}
+
+<h2>4 · Assay quality control</h2>
+<div class="grid">
+<div class="tile"><div class="k">QC status</div><div class="v {{ 'pass' if qc.qc_pass else 'review' }}">{{ 'PASS' if qc.qc_pass else 'REVIEW' }}</div></div>
+<div class="tile"><div class="k">Mean CpG coverage</div><div class="v">{{ qc.mean_cpg_coverage }}×</div></div>
+<div class="tile"><div class="k">Conversion</div><div class="v">{{ (qc.conversion_efficiency*100)|round(1) if qc.conversion_efficiency else "n/a" }}%</div></div>
+<div class="tile"><div class="k">Callable CpGs</div><div class="v">{{ "{:,}".format(qc.n_cpg_callable) }}</div></div>
+<div class="tile"><div class="k">Global CpG meth.</div><div class="v">{{ (qc.global_cpg_methylation*100)|round(1) }}%</div></div>
+<div class="tile"><div class="k">Inferred sex</div><div class="v" style="font-size:11px">{{ qc.inferred_sex.split(' ')[0] }}</div></div>
+</div>
+<img class="fig" src="{{ qc_plot }}" alt="QC">
+
+<div class="disclaimer"><b>Interpretation &amp; limitations.</b> This is a research-grade epigenetic analysis, not a stand-alone diagnostic result. Findings must be interpreted by a qualified professional together with the clinical picture and, where indicated, orthogonal confirmation (e.g., MS-MLPA for imprinting defects) and a locally-validated, ancestry-appropriate reference. Imprinted-DMR panel coordinates and thresholds, and episignature classifiers, require local validation before diagnostic use. Variants/findings of uncertain significance must not direct irreversible management. Classification colours follow the ACMG/AMP severity convention.</div>
+
+<div class="sign">
+  <div class="box">Analysed by (name / signature / date)</div>
+  <div class="box">Authorised by (name / signature / date)</div>
+</div>
+
+<div class="doc-footer">Genomics &amp; Bioinformatics Core Facility · Noguchi Memorial Institute for Medical Research, University of Ghana · Confidential clinical-research document · MethylForge v{{ version }} · {{ date }}<br>Provenance: {{ provenance }}</div>
+</div></body></html>
