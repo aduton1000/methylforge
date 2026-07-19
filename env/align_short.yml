@@ -1,0 +1,15 @@
+# Short-read bisulfite / EM-seq: QC, trimming, methylation-aware alignment, extraction.
+# Apple Silicon: create under Rosetta -> CONDA_SUBDIR=osx-64 mamba env create -f env/align_short.yml
+name: methylforge-align-short
+channels: [conda-forge, bioconda]
+dependencies:
+  - fastqc=0.12.1
+  - fastp=0.23.4
+  - trim-galore=0.6.10
+  - bismark=0.24.2         # bisulfite aligner (bowtie2/HISAT2 backend)
+  - bowtie2=2.5.3
+  - bwameth=0.2.7          # alternative bisulfite aligner (bwa-mem based)
+  - methyldackel=0.6.1     # methylation extraction for bwa-meth BAMs
+  - samtools=1.21
+  - qualimap=2.3
+  - multiqc=1.25

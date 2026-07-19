@@ -1,0 +1,9 @@
+locus	gene	chrom	start	end	normal_meth	hyper_disorder	hypo_disorder	notes
+PWS/AS-IC	SNRPN	chr15	24954860	24956489	0.50	Prader-Willi syndrome	Angelman syndrome	15q11.2 imprinting centre; maternally methylated. Hypermethylation (paternal loss) -> PWS; hypomethylation (maternal loss) -> AS.
+IC1(H19/IGF2)	H19	chr11	1999745	2003546	0.50	Beckwith-Wiedemann syndrome	Silver-Russell syndrome	11p15.5 imprinting centre 1; paternally methylated. Gain -> BWS; loss -> SRS (commonest SRS cause).
+IC2(KvDMR1)	KCNQ1OT1	chr11	2698700	2701277	0.50		Beckwith-Wiedemann syndrome	11p15.5 imprinting centre 2; maternally methylated. Loss of methylation -> BWS (commonest BWS cause).
+TNDM(6q24)	PLAGL1	chr6	144006757	144008751	0.50		Transient neonatal diabetes mellitus	6q24 PLAGL1/HYMAI DMR; maternally methylated. Hypomethylation/paternal UPD6 -> TNDM.
+14q32(MEG3)	MEG3	chr14	100824134	100826140	0.50	Kagami-Ogata syndrome	Temple syndrome	DLK1-MEG3 IG-DMR; paternally methylated. Loss -> Temple syndrome; gain -> Kagami-Ogata syndrome.
+GNAS(20q13)	GNAS	chr20	58839740	58841809	0.50	Pseudohypoparathyroidism	Pseudohypoparathyroidism	GNAS complex locus; aberrant methylation -> pseudohypoparathyroidism spectrum (report as aberrant).
+MEST(7q32)	MEST	chr7	130486150	130494780	0.50		Silver-Russell syndrome	7q32 MEST DMR; maternally methylated. Hypomethylation / maternal UPD7 -> SRS.
+GRB10(7p12)	GRB10	chr7	50780151	50782072	0.50		Silver-Russell syndrome	7p12 GRB10 DMR; associated with UPD7-related SRS.

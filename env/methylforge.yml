@@ -1,0 +1,15 @@
+# MethylForge core analysis + report engine (pure Python — solves on linux-64,
+# osx-64 and osx-arm64). Apple Silicon: `CONDA_SUBDIR=osx-64 mamba env create`
+# is only needed for the heavy-aligner envs, not this one.
+name: methylforge
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - numpy>=1.24
+  - pandas>=2.0
+  - scipy>=1.10
+  - matplotlib>=3.7
+  - jinja2>=3.1
+  - scikit-learn>=1.3      # enables the SVM episignature back-end (optional)
+  - pip
+  - pip: ["-e ."]

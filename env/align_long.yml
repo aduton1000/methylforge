@@ -1,0 +1,12 @@
+# Long-read native 5mC (Nanopore / PacBio). Basecalling with modified-base models
+# (ONT `dorado`) is done UPSTREAM (GPU) and is distributed by ONT separately, not via
+# conda; MethylForge takes the modBAM (MM/ML tags) or FASTQ as input and does
+# alignment + methylation pileup here.
+name: methylforge-align-long
+channels: [conda-forge, bioconda]
+dependencies:
+  - minimap2=2.28
+  - samtools=1.21
+  - modkit=0.3.3           # ONT methylation pileup -> bedMethyl
+  - pbcpgtools=2.3.2       # PacBio HiFi 5mC (optional)
+  - multiqc=1.25

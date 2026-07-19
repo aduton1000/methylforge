@@ -1,0 +1,4 @@
+sample,read_type,methylation,group
+pws_case,precalled,data/pws_case.methyl.tsv,case
+sotos_case,precalled,data/sotos_case.methyl.tsv,case
+normal_control,precalled,data/normal_control.methyl.tsv,control

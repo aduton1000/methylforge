@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+# Nextflow
+work/
+.nextflow*
+results/
+results_test/
+# MethylForge run outputs / test data
+mf_out/
+*_out/
+epiforge_out/
+# OS / editors
+.DS_Store
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,9 @@
+# OPTIONAL — Illumina Infinium MethylationEPIC array processing (episignature standard).
+# R/Bioconductor stack; used only when array IDATs are the input.
+name: methylforge-array
+channels: [conda-forge, bioconda]
+dependencies:
+  - bioconductor-minfi
+  - bioconductor-sesame
+  - bioconductor-conumee
+  - r-base>=4.3
