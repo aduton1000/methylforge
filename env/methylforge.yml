@@ -12,4 +12,7 @@ dependencies:
   - jinja2>=3.1
   - scikit-learn>=1.3      # enables the SVM episignature back-end (optional)
   - pip
-  - pip: ["-e ."]
+# After the env is created, install the package from the REPO ROOT:
+#   conda activate methylforge && pip install -e .
+# (an in-yml `pip: ["-e ."]` is unreliable — conda resolves '.' against env/, not the
+#  repo root, so it is intentionally omitted here.)
