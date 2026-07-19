@@ -11,8 +11,9 @@ process ARRAY_INGEST {
           path "epic_manifest.tsv", emit: manifest
           path "epic_qc.txt"
   script:
+  def chain = params.array_chain ? params.array_chain : ""
   """
-  Rscript ${projectDir}/bin/epic_process.R ${idat_dir} ${sheet} epic_beta.tsv epic_qc.txt ${params.array_genome}
+  Rscript ${projectDir}/bin/epic_process.R ${idat_dir} ${sheet} epic_beta.tsv epic_qc.txt ${params.array_genome} ${chain}
   """
 }
 

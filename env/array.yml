@@ -4,9 +4,13 @@
 # NOTE on the solver: mixing `sesame` (tracks the newest R) with the older
 # annotation/data packages can be unsolvable on some platforms (notably osx-64 /
 # Apple-Silicon-under-Rosetta, where a few annotation builds pin an old r-base).
-# sesame is used ONLY for the optional hg38 coordinate remap, and epic_process.R
-# falls back gracefully without it — so it is kept OPTIONAL below. Install it into
-# this env if the solver allows on your platform (linux-64 HPC usually resolves it):
+# hg38 coordinates: minfi's annotation is hg19. epic_process.R remaps to hg38 by
+# trying (1) sesame's hg38 manifest, then (2) a deterministic UCSC hg19->hg38
+# liftOver (pass the chain via --array_chain), else it keeps hg19. sesame is thus
+# OPTIONAL; note its conda-packaged ExperimentHub registry can be too old to know
+# the *.hg38.manifest titles, in which case the liftOver path is used. Install
+# sesame if your platform solves it (minfi+sesame alone resolve; the older EPIC
+# annotation pin is what conflicts under osx-64):
 #   mamba install -n methylforge-array -c conda-forge -c bioconda bioconductor-sesame bioconductor-sesamedata
 name: methylforge-array
 channels: [conda-forge, bioconda]
