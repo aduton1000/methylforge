@@ -204,7 +204,13 @@ Every `run` emits `SAMPLE.familyforge.json` — a `candidates.json`-compatible o
 
 ## 9. QC gates & interpretation
 
-Defaults (override via the API / config): conversion efficiency ≥ 0.98, mean CpG coverage ≥ 10×, ≥ 1000 callable CpGs (≥ 5× each). Conversion is estimated from non-CpG (CHH) methylation, or from a lambda/pUC19 spike-in if supplied (`lambda_meth`). A failing sample is flagged **REVIEW**, never silently dropped.
+Defaults (override via the API / config): conversion efficiency ≥ 0.98, mean CpG coverage ≥ 10×, ≥ 1000 callable CpGs (≥ 5× each), pUC19 methylated-control retention ≥ 0.95. A failing sample is flagged **REVIEW**, never silently dropped.
+
+**Bisulfite/EM conversion controls (spike-ins).** Conversion is estimated, in order of preference, from (1) **spike-in controls auto-detected in the aligned data** — *lambda phage* (unmethylated → the conversion rate) and *CpG-methylated pUC19* (→ the over-conversion / false-negative rate, gated separately); (2) a provided value; or (3) non-CpG (CHH) methylation. The spike-in FASTAs are downloaded to `_local/refs/spikein_controls.fa`; append them to your genome once so spike-in reads align and get methylation-called:
+```bash
+bin/prepare_reference.sh GRCh38.fa            # -> GRCh38.withspikein.fa, then index it
+```
+MethylForge auto-detects the lambda (`NC_001416`) and pUC19 (`L09137`) contigs in the calls — no extra flags. Contig names are configurable via the `spikein=` argument to `methylation_qc`. Spike-in contigs are excluded from the biological CpG metrics.
 
 ---
 
