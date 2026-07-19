@@ -9,7 +9,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from methylforge import testdata, io as eio, qc as eqc, imprinting as eimp, \
     dmr as edmr, episignature as eepi, pipeline as epipe, export_familyforge as effx, \
-    cohort as ecoh
+    cohort as ecoh, array as earr
 
 
 def test_all():
@@ -55,6 +55,21 @@ def test_all():
     assert cmat.shape[1] == len(cpaths) and cmat.shape[0] > 50, "cohort matrix shape"
     cdmrs = edmr.merge_dmrs(edmr.call_dmps(cmat, cgroups))
     assert (cdmrs.direction == "hyper").sum() >= 2, "cohort DMR should recover implanted signals"
+
+    # episignature reference builder — leave-one-out CV on clean data should be strong
+    bundle = eepi.build_reference(ref, labels, per_class_n=12, min_delta=0.15)
+    assert bundle["metrics"]["accuracy"] >= 0.8, "episignature LOOCV accuracy should be high"
+    assert len(bundle["features"]) > 0 and bundle["ref_matrix"].shape[1] == len(labels)
+
+    # EPIC array ingestion -> coord matrix -> per-sample methyl -> imprinting
+    coord = earr.map_probes_to_coords(earr.read_beta_matrix(d["epic_beta"]),
+                                      earr.load_manifest(d["epic_manifest"]))
+    assert coord.shape[1] == 3, "3 array samples expected"
+    mp = os.path.join(tmp, "arr_pws.methyl.tsv")
+    earr.to_sample_methyl(coord, "arr_pws", mp)
+    imp_arr = eimp.analyse_imprinting(eio.read_methylation(mp))
+    assert imp_arr[imp_arr.locus == "PWS/AS-IC"].iloc[0]["call"] == "hypermethylation", \
+        "array PWS sample should flag SNRPN hypermethylation"
 
     # end-to-end + FamilyForge export
     res = epipe.run(d["samples"]["pws_case"], "selftest", os.path.join(tmp, "out"),

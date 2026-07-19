@@ -122,6 +122,35 @@ for larger cohorts.
 methylforge episign --reference ref.tsv --labels labels.tsv --query query.tsv
 ```
 
+### `methylforge build-reference` — build + validate an episignature reference
+Turns a labelled cohort matrix (feature × sample beta + `sample,class` labels, with a
+`Control` class) into a curated, cross-validated reference you can ship and reuse.
+```bash
+methylforge build-reference --matrix cohort_matrix.tsv --labels labels.tsv \
+  --features-per-class 40 --min-delta 0.15 -o my_reference/
+```
+It (i) selects the most discriminative CpGs per disorder class vs controls (|Δβ| ≥ `--min-delta`
+and M-value t-test p < `--alpha`, top `--features-per-class`), (ii) builds class centroids,
+and (iii) runs **nested leave-one-out cross-validation** (features re-selected each fold — no
+leakage) reporting per-class sensitivity/specificity and overall accuracy. Outputs a bundle:
+`reference_matrix.tsv` + `labels.tsv` (drop-in for `--episign-ref/--episign-labels`),
+`centroids.tsv`, `signatures.json`, and `manifest.json` (params + CV metrics). Use `--no-validate`
+to skip CV.
+
+### `methylforge array` — Illumina EPIC/450K ingestion
+Maps a methylation-array beta matrix into the same coordinate-keyed schema as sequencing data,
+so array-based episignatures/imprinting use the identical downstream. The IDAT→beta step runs
+in R (`bin/epic_process.R`, `modules/stage0_array.nf`, env `array.yml`, minfi funnorm + detP QC),
+emitting a probe×sample beta matrix and a probe→coordinate manifest.
+```bash
+# probe x sample beta (+ manifest from minfi's EPIC annotation) -> coord matrix + per-sample methyl
+methylforge array --beta epic_beta.tsv --manifest epic_manifest.tsv \
+  --out-matrix epic_coord_matrix.tsv --out-methyl-dir epic_methyl/
+# then, e.g.:  methylforge run epic_methyl/SAMPLE.methyl.tsv -s SAMPLE ...
+```
+Arrays carry no read depth, so a nominal coverage (`--cov`, default 30) is assigned to each beta
+(flagged in QC). If the beta matrix is already coordinate-keyed, omit `--manifest`.
+
 ### `methylforge testdata` — synthetic fixture
 ```bash
 methylforge testdata -o mf_demo

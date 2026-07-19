@@ -145,6 +145,54 @@ def generate_cohort(data_dir: str, n_case: int = 8, n_ctrl: int = 8) -> dict:
     return dict(dir=cdir, samplesheet=ss, n=n_case + n_ctrl)
 
 
+def generate_array(data_dir: str, centroids: dict, feats: list) -> dict:
+    """Synthetic Illumina-EPIC-style probe x sample beta matrix + manifest, mapping
+    probes to the same imprinted-DMR and episignature coordinates the rest of the
+    fixture uses — so the array ingestion path can be shown end-to-end."""
+    rng = np.random.default_rng(11)
+    panel = eio.read_dmr_panel()
+    coords = []            # (probe, chrom, pos, kind)
+    pi = 0
+    for _, r in panel.iterrows():
+        for j in range(8):
+            pi += 1
+            coords.append((f"cg{pi:07d}", r.chrom, int(r.start) + 40 * j,
+                           "SNRPN" if r.locus == "PWS/AS-IC" else "imprint"))
+    for f in feats:
+        pi += 1
+        c, p = f.split(":")
+        coords.append((f"cg{pi:07d}", c, int(p), "episig"))
+    for _ in range(500):
+        pi += 1
+        coords.append((f"cg{pi:07d}", f"chr{rng.integers(1, 23)}",
+                       int(rng.integers(9_000_000, 9_500_000)), "bg"))
+    man = pd.DataFrame([(p, c, pos) for p, c, pos, _ in coords], columns=["probe", "chr", "pos"])
+
+    def sample_beta(kind):
+        vals = {}
+        for (probe, c, pos, k) in coords:
+            if k == "SNRPN":
+                b = 0.95 if kind == "pws" else 0.50
+            elif k == "imprint":
+                b = 0.50
+            elif k == "episig":
+                fid = f"{c}:{pos}"
+                cvec = centroids["Sotos_NSD1" if kind == "sotos" else "Control"]
+                b = float(cvec[feats.index(fid)]) if fid in feats else 0.5
+            else:
+                b = float(rng.choice([rng.uniform(0, .15), rng.uniform(.8, 1.0)], p=[.3, .7]))
+            vals[probe] = float(np.clip(b + rng.normal(0, 0.02), 0, 1))
+        return vals
+
+    kinds = {"arr_normal": "normal", "arr_pws": "pws", "arr_sotos": "sotos"}
+    beta = pd.DataFrame({s: pd.Series(sample_beta(k)) for s, k in kinds.items()})
+    beta.index.name = "probe"
+    beta.round(4).to_csv(os.path.join(data_dir, "epic_beta.tsv"), sep="\t")
+    man.to_csv(os.path.join(data_dir, "epic_manifest.tsv"), sep="\t", index=False)
+    return dict(beta=os.path.join(data_dir, "epic_beta.tsv"),
+                manifest=os.path.join(data_dir, "epic_manifest.tsv"))
+
+
 def generate(outdir: str) -> dict:
     os.makedirs(outdir, exist_ok=True)
     data = os.path.join(outdir, "data")
@@ -198,12 +246,15 @@ def generate(outdir: str) -> dict:
         fh.write("chr3\t5999000\t6002000\tTESTGENE2\n")
 
     cohort = generate_cohort(data)
+    array = generate_array(data, centroids, feats)
 
     print(f"[methylforge] test data written to {data}")
     for n, p in paths.items():
         print(f"  sample {n:16s} -> {p}")
     print(f"  cohort ({cohort['n']} samples) -> {cohort['samplesheet']}")
+    print(f"  EPIC array (probe x sample) -> {array['beta']} (+ manifest)")
     return dict(samples=paths, data=data, cohort_samplesheet=cohort["samplesheet"],
+                epic_beta=array["beta"], epic_manifest=array["manifest"],
                 episig_reference=os.path.join(data, "episig_reference.tsv"),
                 episig_labels=os.path.join(data, "episig_labels.tsv"),
                 dmr_matrix=os.path.join(data, "dmr_matrix.tsv"),

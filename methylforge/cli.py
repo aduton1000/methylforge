@@ -70,6 +70,37 @@ def cmd_episign(a):
     _p(eepi.classify(q, centroids, ref, labels))
 
 
+def cmd_build_reference(a):
+    from . import episignature as eepi
+    mat = pd.read_csv(a.matrix, sep="\t", index_col=0)
+    lab = pd.read_csv(a.labels, sep="\t")
+    labels = dict(zip(lab.iloc[:, 0], lab.iloc[:, 1]))
+    b = eepi.build_reference(mat, labels, control_class=a.control_class,
+                             per_class_n=a.features_per_class, min_delta=a.min_delta,
+                             alpha=a.alpha, validate=not a.no_validate)
+    out = eepi.save_reference(b, a.outdir)
+    print(f"[methylforge] reference built: {len(b['features'])} features · classes "
+          f"{sorted(set(labels.values()))} · saved to {a.outdir}")
+    print(f"[methylforge] drop-in: --episign-ref {out['reference_matrix']} "
+          f"--episign-labels {out['labels']}")
+    if b["metrics"]:
+        m = b["metrics"]
+        print(f"[methylforge] leave-one-out CV accuracy {m['accuracy']} (n={m['n']}):")
+        for c, pc in m["per_class"].items():
+            print(f"    {c:18s} sensitivity {pc['sensitivity']}  specificity {pc['specificity']}  (n={pc['n']})")
+
+
+def cmd_array(a):
+    from . import array as earr
+    r = earr.ingest(a.beta, manifest_path=a.manifest, out_matrix=a.out_matrix,
+                    out_methyl_dir=a.out_methyl_dir, cov=a.cov)
+    print(f"[methylforge] EPIC array ingested: {r['n_features']} features x {r['n_samples']} samples")
+    if r.get("matrix"):
+        print(f"[methylforge] coordinate-keyed matrix -> {r['matrix']}")
+    if r.get("methyl_files"):
+        print(f"[methylforge] per-sample methylation -> {a.out_methyl_dir} ({len(r['methyl_files'])} files)")
+
+
 def cmd_cohort(a):
     from . import cohort as ecoh
     if a.samplesheet:
@@ -127,6 +158,25 @@ def build_parser():
     e = sub.add_parser("episign"); e.add_argument("--reference", required=True)
     e.add_argument("--labels", required=True); e.add_argument("--query", required=True)
     e.set_defaults(func=cmd_episign)
+
+    br = sub.add_parser("build-reference", help="build + validate an episignature reference from a labelled cohort matrix")
+    br.add_argument("--matrix", required=True, help="feature x sample beta matrix")
+    br.add_argument("--labels", required=True, help="sample,class TSV (a 'Control' class required)")
+    br.add_argument("-o", "--outdir", required=True)
+    br.add_argument("--control-class", default="Control")
+    br.add_argument("--features-per-class", type=int, default=40)
+    br.add_argument("--min-delta", type=float, default=0.15)
+    br.add_argument("--alpha", type=float, default=0.05)
+    br.add_argument("--no-validate", action="store_true", help="skip leave-one-out CV")
+    br.set_defaults(func=cmd_build_reference)
+
+    ar = sub.add_parser("array", help="ingest an Illumina EPIC/450K beta matrix -> coord-keyed matrix / per-sample methyl")
+    ar.add_argument("--beta", required=True, help="probe x sample beta matrix (from minfi/sesame)")
+    ar.add_argument("--manifest", help="probe->chrom,pos TSV (omit if beta already coord-keyed)")
+    ar.add_argument("--out-matrix", help="write coordinate-keyed feature x sample matrix")
+    ar.add_argument("--out-methyl-dir", help="write per-sample methylation TSVs (for run/imprinting)")
+    ar.add_argument("--cov", type=int, default=30, help="nominal coverage assigned to array betas")
+    ar.set_defaults(func=cmd_array)
 
     co = sub.add_parser("cohort", help="build a feature x sample methylation matrix from many samples")
     co.add_argument("--samplesheet", help="CSV: sample,methylation[,group]")
