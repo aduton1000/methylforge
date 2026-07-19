@@ -96,6 +96,14 @@ def _sample_records(imprint_overrides: dict, epi_class: str, ref_centroids, feat
     for _ in range(200):
         rec.append(("chrY", int(RNG.integers(2_700_000, 2_800_000)),
                     float(RNG.uniform(0, 1)), ycov, "CpG"))
+    # bisulfite-conversion spike-ins: lambda (unmethylated -> ~99.5% conversion)
+    # and CpG-methylated pUC19 (~98% retained -> low over-conversion)
+    for _ in range(200):
+        rec.append(("NC_001416.1", int(RNG.integers(1, 48502)),
+                    float(np.clip(RNG.normal(0.005, 0.003), 0, 0.05)), 30, "CHH"))
+    for _ in range(50):
+        rec.append(("L09137.1", int(RNG.integers(1, 2686)),
+                    float(np.clip(RNG.normal(0.98, 0.01), 0.9, 1.0)), 30, "CpG"))
     return rec
 
 

@@ -20,7 +20,10 @@ def test_all():
     meth = eio.read_methylation(d["samples"]["pws_case"])
     m = eqc.methylation_qc(meth)
     assert m["qc_pass"], "QC should pass on clean synthetic data"
-    assert m["conversion_efficiency"] >= 0.98, "conversion ~100% expected (CHH near 0)"
+    assert m["conversion_efficiency"] >= 0.98, "conversion ~100% expected"
+    assert m["conversion_source"].startswith("lambda spike-in"), "spike-in should drive conversion QC"
+    assert "puc19_methylation" in m["spikein"] and m["checks"].get("overconversion"), \
+        "pUC19 over-conversion control + gate expected"
 
     # imprinting — PWS case
     imp = eimp.analyse_imprinting(meth)

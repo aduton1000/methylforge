@@ -111,6 +111,7 @@ img.fig{max-width:100%;border:1px solid var(--line);border-radius:6px;margin:6px
 <div class="tile"><div class="k">Global CpG meth.</div><div class="v">{{ (qc.global_cpg_methylation*100)|round(1) }}%</div></div>
 <div class="tile"><div class="k">Inferred sex</div><div class="v" style="font-size:11px">{{ qc.inferred_sex.split(' ')[0] }}</div></div>
 </div>
+<div class="subtitle">Conversion source: {{ qc.conversion_source }}{% if 'puc19_methylation' in qc.spikein %} · pUC19 methylated-control retention {{ (qc.spikein.puc19_methylation*100)|round(1) }}% (over-conversion {{ (qc.spikein.puc19_overconversion*100)|round(2) }}%){% endif %}.</div>
 <img class="fig" src="{{ qc_plot }}" alt="QC">
 
 <div class="disclaimer"><b>Interpretation &amp; limitations.</b> This is a research-grade epigenetic analysis, not a stand-alone diagnostic result. Findings must be interpreted by a qualified professional together with the clinical picture and, where indicated, orthogonal confirmation (e.g., MS-MLPA for imprinting defects) and a locally-validated, ancestry-appropriate reference. Imprinted-DMR panel coordinates and thresholds, and episignature classifiers, require local validation before diagnostic use. Variants/findings of uncertain significance must not direct irreversible management. Classification colours follow the ACMG/AMP severity convention.</div>

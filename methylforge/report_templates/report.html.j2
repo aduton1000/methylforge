@@ -58,7 +58,7 @@ code{background:var(--card);padding:1px 5px;border-radius:4px;font-size:.85em}
 <div class="tile"><div class="k">Inferred sex</div><div class="v" style="font-size:.95rem">{{ qc.inferred_sex.split(' ')[0] }}</div></div>
 </div>
 {% if qc_plot %}<img src="{{ qc_plot }}" alt="QC plots">{% endif %}
-<div class="sub">Conversion estimated from {{ qc.conversion_source }}. Gates: coverage ≥{{ qc.gates.min_mean_cov }}×, conversion ≥{{ (qc.gates.min_conversion*100)|round(0) }}%, ≥{{ qc.gates.min_cpg_callable }} callable CpGs.</div>
+<div class="sub">Conversion estimated from {{ qc.conversion_source }}.{% if 'puc19_methylation' in qc.spikein %} pUC19 methylated-control over-conversion {{ (qc.spikein.puc19_overconversion*100)|round(2) }}%.{% endif %} Gates: coverage ≥{{ qc.gates.min_mean_cov }}×, conversion ≥{{ (qc.gates.min_conversion*100)|round(0) }}%, ≥{{ qc.gates.min_cpg_callable }} callable CpGs.</div>
 
 <h2>2 · Imprinting-disorder analysis</h2>
 <div class="banner {{ imprint_summary.severity }}"><b>Imprinting</b>{{ imprint_summary.headline }}</div>
