@@ -1,3 +1,9 @@
+---
+output:
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+---
 # MethylForge — User Manual
 
 MethylForge is a reproducible epigenome (DNA-methylation) analysis pipeline. It takes methylation data from short- or long-read sequencing (genome-wide or targeted), performs QC, imprinting-disorder analysis, episignature classification, and differential-methylation calling, and produces branded clinical and research reports plus a FamilyForge-compatible export. This manual covers installation, inputs, every command and stage, the report engine, interoperability, and the standards/limitations you must observe.
@@ -182,7 +188,9 @@ Profiles: exec ∈ `local|hpc_slurm`; pkg ∈ `conda|mamba|docker|singularity|ap
 
 **Entry modes (`--mode`):**
 - `sequencing` (default) — short/long/precalled methylation → per-sample analysis + reports, then an automatic batch QC dashboard. Needs `--samplesheet` (+ `--reference` for FASTQ/modBAM input).
-- `array` — Illumina EPIC/450K. Either from raw IDATs (`--idat_dir` + `--array_sheet`, or `--array_sheet auto` to use a sample sheet inside the IDAT dir) → beta matrix via minfi (funnorm; noob for a single sample) with hg38 coordinates via sesame (`--array_genome hg38|hg19`); **or** from a pre-computed matrix (`--array_beta beta.tsv --array_manifest manifest.tsv`, skipping the R step). Then per-sample methylation → the same analysis + reports. The IDAT→beta step needs the R env (`env/array.yml`); validate it on the cluster with `bash test/test_array_hpc.sh` (uses minfi's bundled example IDATs — no patient data).
+- `array` — Illumina EPIC/450K. Either from raw IDATs (`--idat_dir` + `--array_sheet`, or `--array_sheet auto` to use a sample sheet inside the IDAT dir) → beta matrix via minfi (funnorm; noob for a single sample); **or** from a pre-computed matrix (`--array_beta beta.tsv --array_manifest manifest.tsv`, skipping the R step). Then per-sample methylation → the same analysis + reports.
+  - **hg38 coordinates** (`--array_genome hg38`, the default; needed to match the GRCh38 imprinting panel): `epic_process.R` remaps minfi's hg19 annotation to hg38 by trying sesame's hg38 manifest first, then a **deterministic UCSC liftOver** (pass the chain with `--array_chain hg19ToHg38.over.chain`), else it keeps hg19 and records which in the QC. Get the chain from UCSC: `hgdownload.soe.ucsc.edu/goldenPath/hg19/liftOver/hg19ToHg38.over.chain.gz`.
+  - The IDAT→beta step needs the R env (`env/array.yml`); validate it with `bash test/test_array_hpc.sh` (minfi's bundled example IDATs — no patient data). *Validated on this build: 6 example 450K arrays → 473k probes → 99.97% liftOver to hg38 → per-sample methylation.*
 - `cohort_qc` — batch QC dashboard only, from `--samplesheet` (`sample,methylation`).
 
 Key params: `--targets` (targeted BED), `--library bisulfite|emseq`, `--aligner bismark|bwameth`, `--episign_ref/--episign_labels`, `--run_dmr --dmr_matrix --dmr_groups`, `--genes_bed`, `--report_modes`, `--cohort_qc true|false` (batch dashboard), `--max_cpus/--max_memory`.
