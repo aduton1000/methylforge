@@ -1,9 +1,17 @@
-# OPTIONAL — Illumina Infinium MethylationEPIC array processing (episignature standard).
-# R/Bioconductor stack; used only when array IDATs are the input.
+# Illumina Infinium MethylationEPIC / 450K array processing (episignature standard).
+# R/Bioconductor stack; used only when array IDATs are the input (`--mode array`).
 name: methylforge-array
 channels: [conda-forge, bioconda]
 dependencies:
-  - bioconductor-minfi
-  - bioconductor-sesame
-  - bioconductor-conumee
   - r-base>=4.3
+  - bioconductor-minfi
+  - bioconductor-sesame            # hg38 coordinate remap
+  - bioconductor-sesamedata
+  - bioconductor-conumee           # CNV from array intensities (optional)
+  # EPIC + 450K manifests / annotations (probe -> coordinate)
+  - bioconductor-illuminahumanmethylationepicmanifest
+  - bioconductor-illuminahumanmethylationepicanno.ilm10b4.hg19
+  - bioconductor-illuminahumanmethylation450kmanifest
+  - bioconductor-illuminahumanmethylation450kanno.ilmn12.hg19
+  # bundled example 450K IDATs for the HPC self-test (test/test_array_hpc.sh)
+  - bioconductor-minfidata
