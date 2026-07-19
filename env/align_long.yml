@@ -6,7 +6,10 @@ name: methylforge-align-long
 channels: [conda-forge, bioconda]
 dependencies:
   - minimap2=2.28
-  - samtools=1.21
-  - modkit=0.3.3           # ONT methylation pileup -> bedMethyl
-  - pbcpgtools=2.3.2       # PacBio HiFi 5mC (optional)
-  - multiqc=1.25
+  - samtools>=1.21
+  - ont-modkit            # provides the `modkit` binary (ONT methylation pileup -> bedMethyl).
+                          # NOTE: the old bioconda `modkit` package was renamed to `ont-modkit`.
+  - multiqc>=1.25
+  # PacBio HiFi 5mC — pb-CpG-tools is distributed by PacBio as a GitHub binary, NOT on
+  # bioconda; install separately only if you process PacBio data:
+  #   https://github.com/PacificBiosciences/pb-CpG-tools
