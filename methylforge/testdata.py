@@ -107,6 +107,44 @@ def _write_native(records, path):
     )[["chrom", "start", "end", "context", "meth", "cov", "beta"]].to_csv(path, sep="\t", index=False)
 
 
+def generate_cohort(data_dir: str, n_case: int = 8, n_ctrl: int = 8) -> dict:
+    """Replicate case/control cohort of per-sample methylation files (shared CpG
+    positions) with one implanted hypermethylated DMR block and SNRPN hyper in
+    cases — so `methylforge cohort` -> `methylforge dmr` can be shown end-to-end."""
+    rng = np.random.default_rng(7)
+    bg = [(f"chr{1 + (i % 5)}", 2_000_000 + i * 80) for i in range(300)]   # shared null sites
+    bg_base = rng.uniform(0.1, 0.9, len(bg))
+    dmr_block = [("chr8", 7_000_000 + i * 60) for i in range(12)]           # implanted DMR
+    panel = eio.read_dmr_panel()
+    snrpn = panel[panel.locus == "PWS/AS-IC"].iloc[0]
+    snrpn_cpgs = [(snrpn.chrom, int(snrpn.start) + 40 * j) for j in range(8)]
+    cdir = os.path.join(data_dir, "cohort")
+    os.makedirs(cdir, exist_ok=True)
+
+    def write_sample(name, is_case):
+        rec = []
+        for (c, p), b in zip(bg, bg_base):
+            rec.append((c, p, float(np.clip(b + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
+        for (c, p) in dmr_block:
+            rec.append((c, p, float(np.clip((0.85 if is_case else 0.30) + rng.normal(0, 0.04), 0, 1)), 30, "CpG"))
+        for (c, p) in snrpn_cpgs:
+            rec.append((c, p, float(np.clip((0.95 if is_case else 0.50) + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
+        path = os.path.join(cdir, f"{name}.methyl.tsv")
+        _write_native(rec, path)
+        return path
+
+    rows = []
+    for i in range(n_case):
+        p = write_sample(f"case{i+1}", True)
+        rows.append((f"case{i+1}", os.path.relpath(p, data_dir), "case"))
+    for i in range(n_ctrl):
+        p = write_sample(f"ctrl{i+1}", False)
+        rows.append((f"ctrl{i+1}", os.path.relpath(p, data_dir), "control"))
+    ss = os.path.join(data_dir, "cohort_samplesheet.csv")
+    pd.DataFrame(rows, columns=["sample", "methylation", "group"]).to_csv(ss, index=False)
+    return dict(dir=cdir, samplesheet=ss, n=n_case + n_ctrl)
+
+
 def generate(outdir: str) -> dict:
     os.makedirs(outdir, exist_ok=True)
     data = os.path.join(outdir, "data")
@@ -159,10 +197,13 @@ def generate(outdir: str) -> dict:
         fh.write("chr3\t4999000\t5002000\tTESTGENE1\n")
         fh.write("chr3\t5999000\t6002000\tTESTGENE2\n")
 
+    cohort = generate_cohort(data)
+
     print(f"[methylforge] test data written to {data}")
     for n, p in paths.items():
         print(f"  sample {n:16s} -> {p}")
-    return dict(samples=paths, data=data,
+    print(f"  cohort ({cohort['n']} samples) -> {cohort['samplesheet']}")
+    return dict(samples=paths, data=data, cohort_samplesheet=cohort["samplesheet"],
                 episig_reference=os.path.join(data, "episig_reference.tsv"),
                 episig_labels=os.path.join(data, "episig_labels.tsv"),
                 dmr_matrix=os.path.join(data, "dmr_matrix.tsv"),

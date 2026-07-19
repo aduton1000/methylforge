@@ -8,7 +8,8 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from methylforge import testdata, io as eio, qc as eqc, imprinting as eimp, \
-    dmr as edmr, episignature as eepi, pipeline as epipe, export_familyforge as effx
+    dmr as edmr, episignature as eepi, pipeline as epipe, export_familyforge as effx, \
+    cohort as ecoh
 
 
 def test_all():
@@ -47,6 +48,13 @@ def test_all():
     groups = dict(zip(gdf.iloc[:, 0], gdf.iloc[:, 1]))
     dmrs = edmr.merge_dmrs(edmr.call_dmps(mat, groups))
     assert len(dmrs) >= 1 and (dmrs.direction == "hyper").any(), "expected a hypermethylated DMR"
+
+    # cohort matrix builder -> DMR (should recover implanted DMR block + SNRPN)
+    cpaths, cgroups = ecoh.read_samplesheet(d["cohort_samplesheet"])
+    cmat = ecoh.build_matrix(cpaths)
+    assert cmat.shape[1] == len(cpaths) and cmat.shape[0] > 50, "cohort matrix shape"
+    cdmrs = edmr.merge_dmrs(edmr.call_dmps(cmat, cgroups))
+    assert (cdmrs.direction == "hyper").sum() >= 2, "cohort DMR should recover implanted signals"
 
     # end-to-end + FamilyForge export
     res = epipe.run(d["samples"]["pws_case"], "selftest", os.path.join(tmp, "out"),
