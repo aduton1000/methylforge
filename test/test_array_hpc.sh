@@ -19,4 +19,4 @@ methylforge array --beta epic_beta.tsv --manifest epic_manifest.tsv \
 echo "[4/4] QC one converted sample ..."
 S=$(ls methyl/*.methyl.tsv | head -1)
 methylforge qc "$S" | head -18
-echo "OK — array IDAT -> beta -> methylation chain works on this cluster."
+echo "OK — array IDAT -> beta -> methylation chain works on this machine."
