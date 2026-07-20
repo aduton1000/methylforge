@@ -62,11 +62,23 @@ def read_bedmethyl(path) -> pd.DataFrame:
 
 
 def read_bedgraph(path) -> pd.DataFrame:
-    df = pd.read_csv(_open(path), sep="\t", header=None,
-                     names=["chrom", "start", "end", "pct"], comment="t")
-    df["cov"] = 30  # unknown -> nominal; bedGraph carries no coverage
-    df["meth"] = (df["pct"] / 100.0 * df["cov"]).round().astype(int)
-    return _finalise(df)
+    """bedGraph methylation. Handles the 6-column MethylDackel format
+    (chrom start end pct nMeth nUnmeth) — carrying real coverage — as well as a
+    plain 4-column bedGraph; skips the leading `track ...` header line."""
+    import io as _pyio
+    lines = [ln for ln in _open(path) if ln.strip() and not ln.startswith(("track", "#"))]
+    if not lines:
+        return pd.DataFrame(columns=REQ)
+    df = pd.read_csv(_pyio.StringIO("".join(lines)), sep="\t", header=None)
+    out = pd.DataFrame({"chrom": df[0], "start": df[1], "end": df[2]})
+    if df.shape[1] >= 6:                      # MethylDackel: real methylated/unmethylated counts
+        out["meth"] = df[4].astype(int)
+        out["cov"] = df[4].astype(int) + df[5].astype(int)
+    else:                                     # plain bedGraph: only a percentage, no coverage
+        out["cov"] = 30
+        out["meth"] = (df[3].astype(float) / 100.0 * out["cov"]).round().astype(int)
+    out["context"] = "CpG"
+    return _finalise(out)
 
 
 def read_methylforge_tsv(path) -> pd.DataFrame:
