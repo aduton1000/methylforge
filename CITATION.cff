@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use MethylForge, please cite it as below."
+title: "MethylForge: a reproducible epigenome (DNA-methylation) analysis pipeline (methylation calls -> imprinting / episignature / DMR -> clinical & research reports)"
+abstract: >-
+  MethylForge is an organism- and disease-agnostic Nextflow DSL2 + Python pipeline
+  for DNA-methylation (epigenome) analysis. It ingests short-read bisulfite/EM-seq,
+  long-read native-5mC (Nanopore/PacBio), pre-called per-CpG methylation, or Illumina
+  EPIC/450K array data, normalises everything to a single per-cytosine schema, and
+  produces methylation QC, imprinted-DMR (imprinting-disorder) analysis, episignature
+  classification, cohort DMP/DMR calling, and branded clinical/research reports. It is
+  the epigenome counterpart to the CallForge germline-variant pipeline and emits a
+  FamilyForge-compatible findings hand-off for downstream interpretation.
+authors:
+  - family-names: "Adu"
+    given-names: "Bright"
+    affiliation: "Genomics & Bioinformatics Core, Noguchi Memorial Institute for Medical Research, University of Ghana, Legon, Ghana"
+version: 0.1.0
+license: MIT
+type: software
+keywords:
+  - bioinformatics
+  - DNA methylation
+  - epigenome
+  - bisulfite sequencing
+  - nanopore
+  - episignature
+  - imprinting disorders
+  - differential methylation
+  - nextflow
+references:
+  - type: software
+    title: "CallForge: a targeted-capture germline analysis pipeline"
+    notes: "Sibling sequence-variant pipeline; MethylForge emits a FamilyForge-compatible findings hand-off that pairs with CallForge output."
+  - type: software
+    title: "FamilyForge: family-based variant interpretation and reporting"
+    notes: "Downstream interpretation layer that ingests MethylForge's candidates.json-compatible findings export."

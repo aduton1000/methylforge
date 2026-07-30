@@ -85,8 +85,15 @@ def test_all():
     res = epipe.run(d["samples"]["pws_case"], "selftest", os.path.join(tmp, "out"),
                     family="FAM", episign_ref=d["episig_reference"],
                     episign_labels=d["episig_labels"])
-    for html in res["outputs"].values():
-        assert os.path.getsize(html) > 50000, "report HTML should be substantial (embedded figures)"
+    for key, out in res["outputs"].items():
+        if str(out).endswith(".html"):
+            assert os.path.getsize(out) > 50000, "report HTML should be substantial (embedded figures)"
+    # Excel findings workbook wired into the pipeline
+    xlsx = res["outputs"].get("findings_xlsx")
+    assert xlsx and os.path.isfile(xlsx), "run should emit a .findings.xlsx workbook"
+    import openpyxl
+    wb = openpyxl.load_workbook(xlsx)
+    assert wb.sheetnames == ["Findings", "Imprinting loci", "QC"], "findings workbook sheets"
     ff = os.path.join(tmp, "out", "selftest.familyforge.json")
     effx.export(res, ff, family_id="FAM")
     import json

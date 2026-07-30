@@ -9,7 +9,7 @@ description = "MethylForge — reproducible epigenome (DNA-methylation) analysis
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "aduton1000" }]
+authors = [{ name = "Bright Adu", email = "bright.adu@gmail.com" }]
 keywords = ["epigenome", "methylation", "bisulfite", "nanopore", "episignature", "imprinting", "DMR", "nextflow"]
 dependencies = [
   "numpy>=1.24",
@@ -17,10 +17,11 @@ dependencies = [
   "scipy>=1.10",
   "matplotlib>=3.7",
   "jinja2>=3.1",
+  "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
-ml = ["scikit-learn>=1.3"]          # enables the SVM episignature back-end
+ml = ["scikit-learn>=1.3,<1.11"]    # optional SVM episignature back-end (see env/methylforge.yml)
 dev = ["pytest>=7"]
 
 [project.scripts]
