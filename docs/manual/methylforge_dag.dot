@@ -1,0 +1,102 @@
+// MethylForge pipeline DAG — colour-coded by stage group, input-type-aware, with
+// external inputs/resources and the standalone `methylforge <subcommand>` map.
+// Render: dot -Tpng -Gdpi=200 methylforge_dag.dot -o figures/architecture.png
+//         dot -Tpdf            methylforge_dag.dot -o figures/architecture.pdf
+digraph MethylForge {
+    rankdir=TB;
+    bgcolor="white";
+    labelloc="t";
+    fontname="Helvetica-Bold"; fontsize=20;
+    label="MethylForge — epigenome (DNA-methylation) analysis (methylation calls → imprinting · episignature · DMR → clinical & research reports)";
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.16,0.09"];
+    edge [color="#5f6368", arrowsize=0.8];
+
+    // ─── external inputs / resources (cylinders) ───
+    node [shape=cylinder, style="filled", fillcolor="#fffde7", color="#f9a825"];
+    FQ    [label="Short-read FASTQ\nbisulfite / EM-seq\n(paired-end)"];
+    LR    [label="Long-read modBAM / FASTQ\nNanopore·PacBio native 5mC\n(MM/ML tags; dorado upstream)"];
+    PRE   [label="Pre-called methylation\nBismark .cov · bedGraph ·\nENCODE bedMethyl · native TSV"];
+    IDAT  [label="Illumina EPIC / 450K\nIDAT (+ minfi sample sheet)"];
+    REF   [label="Reference genome FASTA\n(+ bisulfite spike-ins:\nlambda · pUC19)"];
+    PANEL [label="Imprinted-DMR panel TSV\n(bundled; locally validated)"];
+    EPIREF[label="Episignature reference\nmatrix + labels\n(locally / ancestry-matched)"];
+    GENES [label="Genes BED\n(DMR annotation)"];
+
+    // ─── main pipeline nodes, coloured by stage group ───
+    node [shape=box, style="rounded,filled"];
+
+    // array ingest (mode array)
+    A0 [label="Stage 0 — Array ingest (--mode array)\nminfi/sesame: IDAT → beta + manifest\n(bin/epic_process.R) → coord-keyed methyl\n[methylforge array]", fillcolor="#f3e5f5", color="#8e24aa"];
+
+    // read QC / trim
+    S1 [label="Stage 1 — Read QC & trimming\nFastQC · fastp (bisulfite-aware)", fillcolor="#fef7e0", color="#f9ab00"];
+
+    // alignment
+    S2s [label="Stage 2 (short) — Methylation-aware alignment\nBismark (default) | bwa-meth · dedup", fillcolor="#e6f4ea", color="#34a853"];
+    S2l [label="Stage 2 (long) — Align + pileup\nminimap2 -y → modkit pileup → bedMethyl", fillcolor="#e6f4ea", color="#34a853"];
+
+    // extraction
+    S3 [label="Stage 3 — Methylation extraction\nMethylDackel (CpG + CHG/CHH) → bedGraph", fillcolor="#d7f0e3", color="#137333"];
+
+    // convergence node
+    MC [label="Per-CpG methylation\n(normalised schema: chrom·pos·meth·cov·beta·context)", fillcolor="#d7f0e3", color="#137333", shape=box, style="rounded,filled,bold"];
+
+    // analysis engine
+    S4 [label="Stage 4 — Methylation QC\nconversion (spike-in / CHH) · coverage ·\nglobal meth by context · inferred sex · gates\n[methylforge qc]", fillcolor="#fce8e6", color="#ea4335"];
+    S5 [label="Stage 5 — Imprinted-DMR analysis\nloss/gain vs per-locus normal → disorder\n+ MLID flag\n[methylforge imprinting]", fillcolor="#ede7f6", color="#673ab7"];
+    S7 [label="Stage 7 — Episignature classification\nnearest-centroid (default) | sklearn SVM\ncalibrated confidence + inconclusive zone\n[methylforge episign · build-reference]", fillcolor="#ede7f6", color="#673ab7"];
+    S6 [label="Stage 6 — Differential methylation (cohort)\nDMP: Mann-Whitney/Welch-t on M-values + BH-FDR\n→ merge → DMR\n[methylforge cohort → dmr]", fillcolor="#e0f7fa", color="#00acc1"];
+    S8 [label="Stage 8 — Region annotation\nnearest gene / context (genes BED)", fillcolor="#e0f7fa", color="#00acc1"];
+
+    // reporting
+    S9 [label="Stage 9 — Report engine\nclinical (GBCF/Noguchi, ACMG colours) +\nresearch (full DMR detail) · results.json\n[methylforge run]", fillcolor="#eceff1", color="#546e7a"];
+    S9b[label="Stage 9b — Excel findings workbook\nFindings · Imprinting loci · QC\n[methylforge findings-xlsx]", fillcolor="#eceff1", color="#546e7a"];
+    FF [label="FamilyForge export\ncandidates.json-compatible + epi_findings TSV\n(tiered A/B/C)", fillcolor="#fbe9e7", color="#d84315"];
+    CQ [label="Batch cohort QC dashboard\nMultiQC-style HTML + summary TSV\n[methylforge cohort-qc]", fillcolor="#f3e5f5", color="#8e24aa"];
+
+    // ─── short-read spine ───
+    FQ  -> S1 -> S2s -> S3 -> MC;
+    // ─── long-read spine ───
+    LR  -> S2l -> MC;
+    // ─── pre-called + array feed the convergence node ───
+    PRE -> MC;
+    IDAT -> A0 -> MC;
+
+    // ─── analysis fan-out from the normalised methylation ───
+    MC -> S4;
+    MC -> S5;
+    MC -> S7;
+    MC -> S6 [label="cohort matrix", fontsize=9, fontcolor="#00acc1"];
+    S6 -> S8;
+
+    // ─── into reporting ───
+    S4 -> S9; S5 -> S9; S7 -> S9; S8 -> S9 [style=dotted];
+    S9 -> S9b; S9 -> FF;
+    MC -> CQ [style=dotted, constraint=false, label="all samples", fontsize=8, fontcolor="#8e24aa"];
+
+    // ─── resources feeding stages (amber, dashed = drives/labels) ───
+    REF   -> S2s [color="#f9a825"];
+    REF   -> S2l [color="#f9a825", style=dashed, constraint=false];
+    REF   -> S3  [color="#f9a825", style=dashed, constraint=false];
+    PANEL -> S5  [color="#f9a825", style=dashed, constraint=false, label="loci", fontsize=8];
+    EPIREF-> S7  [color="#f9a825", style=dashed, constraint=false, label="reference", fontsize=8];
+    GENES -> S8  [color="#f9a825", style=dashed, constraint=false];
+
+    // ─── legend ───
+    subgraph cluster_legend {
+        label="Stage groups"; fontsize=12; fontname="Helvetica-Bold"; style="rounded"; color="#bbbbbb";
+        node [shape=box, style="rounded,filled", fontsize=9, width=2.6];
+        L0 [label="Array ingest / cohort QC", fillcolor="#f3e5f5", color="#8e24aa"];
+        L1 [label="Read QC / trimming", fillcolor="#fef7e0", color="#f9ab00"];
+        L2 [label="Alignment", fillcolor="#e6f4ea", color="#34a853"];
+        L3 [label="Extraction / methylation calls", fillcolor="#d7f0e3", color="#137333"];
+        L4 [label="Methylation QC", fillcolor="#fce8e6", color="#ea4335"];
+        L5 [label="Imprinting / episignature", fillcolor="#ede7f6", color="#673ab7"];
+        L6 [label="DMR / annotation", fillcolor="#e0f7fa", color="#00acc1"];
+        L7 [label="Reporting", fillcolor="#eceff1", color="#546e7a"];
+        L8 [label="FamilyForge hand-off", fillcolor="#fbe9e7", color="#d84315"];
+        L9 [label="External input / resource\n(dashed = drives/labels)", fillcolor="#fffde7", color="#f9a825", shape=cylinder];
+        Lsub [label="[methylforge <cmd>] = runnable standalone\n(methylforge run = single-sample engine)", fillcolor="#ffffff", color="#546e7a"];
+        L0->L1->L2->L3->L4->L5->L6->L7->L8->L9->Lsub [style=invis];
+    }
+}

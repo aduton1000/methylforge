@@ -23,3 +23,12 @@ epiforge_out/
 
 # Downloaded reference databases (not source; see _local/refs/PROVENANCE.md)
 _local/
+
+# Generated manual build artifacts at repo root (the maintained manual lives in docs/manual/)
+/MANUAL.html
+/MANUAL.pdf
+# Manual build intermediates
+docs/manual/*.aux
+docs/manual/*.log
+docs/manual/*.out
+docs/manual/*.toc

@@ -23,7 +23,7 @@ def run(meth_path: str, sample: str, outdir: str, *,
         episign_ref: str | None = None, episign_labels: str | None = None,
         dmr_matrix: str | None = None, dmr_groups: str | None = None,
         genes_bed: str | None = None, gates: dict | None = None,
-        lambda_meth: float | None = None) -> dict:
+        lambda_meth: float | None = None, excel: bool = True) -> dict:
     os.makedirs(outdir, exist_ok=True)
     meth = eio.read_methylation(meth_path)
 
@@ -66,5 +66,13 @@ def run(meth_path: str, sample: str, outdir: str, *,
         erep.render_report(results, out_html, mode=mode)
         outputs[mode] = out_html
     erep.write_results_json(results, os.path.join(outdir, f"{sample}.results.json"))
+
+    # Stage 9b — Excel findings workbook (Findings · Imprinting loci · QC)
+    if excel:
+        from . import export_excel as exxl
+        xlsx = os.path.join(outdir, f"{sample}.findings.xlsx")
+        exxl.write_sample_findings_xlsx(results, xlsx)
+        outputs["findings_xlsx"] = xlsx
+
     results["outputs"] = outputs
     return results

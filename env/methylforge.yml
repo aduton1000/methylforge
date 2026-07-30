@@ -10,7 +10,11 @@ dependencies:
   - scipy>=1.10
   - matplotlib>=3.7
   - jinja2>=3.1
-  - scikit-learn>=1.3      # enables the SVM episignature back-end (optional)
+  - openpyxl>=3.1          # Excel (.xlsx) findings workbooks
+  - scikit-learn>=1.3,<1.11   # optional SVM episignature back-end; <1.11 keeps the
+                              # calibrated SVC(probability=True) behaviour (deprecated in
+                              # sklearn 1.9, removed in 1.11). Nearest-centroid is the
+                              # default and needs no sklearn.
   - pip
 # After the env is created, install the package from the REPO ROOT:
 #   conda activate methylforge && pip install -e .

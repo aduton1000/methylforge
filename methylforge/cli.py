@@ -2,7 +2,8 @@
 
 Subcommands:
   run         end-to-end analysis of one sample -> clinical + research HTML,
-              results.json, and a FamilyForge-compatible findings export
+              results.json, an Excel findings workbook, and a FamilyForge export
+  findings-xlsx  aggregate per-sample FamilyForge findings into one Excel workbook
   qc          methylation QC only
   imprinting  imprinted-DMR analysis only
   dmr         differential methylation (cohort matrix)
@@ -140,6 +141,16 @@ def cmd_cohortqc(a):
         print(f"[methylforge] summary -> {a.summary_out}")
 
 
+def cmd_findings_xlsx(a):
+    import glob
+    from . import export_excel as exxl
+    paths = [f for pat in a.familyforge for f in sorted(glob.glob(pat))]
+    if not paths:
+        raise SystemExit("no FamilyForge JSON files matched")
+    exxl.cohort_from_familyforge(paths, a.out, title=a.title)
+    print(f"[methylforge] cohort findings workbook ({len(paths)} samples) -> {a.out}")
+
+
 def cmd_testdata(a):
     from . import testdata
     testdata.generate(a.outdir)
@@ -219,6 +230,13 @@ def build_parser():
     cq.add_argument("--summary-out", help="write a summary TSV")
     cq.add_argument("--title", default="MethylForge cohort QC")
     cq.set_defaults(func=cmd_cohortqc)
+
+    fx = sub.add_parser("findings-xlsx", help="aggregate per-sample FamilyForge findings into one Excel workbook")
+    fx.add_argument("--familyforge", nargs="+", required=True,
+                    help="<sample>.familyforge.json files/globs")
+    fx.add_argument("--out", required=True, help="output .xlsx")
+    fx.add_argument("--title", default="MethylForge cohort findings")
+    fx.set_defaults(func=cmd_findings_xlsx)
 
     t = sub.add_parser("testdata"); t.add_argument("-o", "--outdir", default="methylforge_testdata")
     t.set_defaults(func=cmd_testdata)
