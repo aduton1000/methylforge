@@ -26,6 +26,13 @@ def test_all():
     assert "puc19_methylation" in m["spikein"] and m["checks"].get("overconversion"), \
         "pUC19 over-conversion control + gate expected"
 
+    # sex inference (chrX:autosome depth — robust to chrY mis-mapping)
+    assert m["inferred_sex"].startswith("male"), f"pws_case should be male: {m['inferred_sex']}"
+    sx = eqc.infer_sex(meth[meth.context == "CpG"])
+    assert sx["sex"] == "male" and sx["confidence"] == "high", sx
+    mN = eqc.methylation_qc(eio.read_methylation(d["samples"]["normal_control"]))
+    assert mN["inferred_sex"].startswith("female"), f"normal_control should be female: {mN['inferred_sex']}"
+
     # imprinting — PWS case
     imp = eimp.analyse_imprinting(meth)
     snrpn = imp[imp.locus == "PWS/AS-IC"].iloc[0]

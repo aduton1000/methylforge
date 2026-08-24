@@ -91,7 +91,14 @@ def _sample_records(imprint_overrides: dict, epi_class: str, ref_centroids, feat
         chrom = f"chr{RNG.integers(1, 23)}"
         pos = int(RNG.integers(4_000_000, 4_200_000))
         rec.append((chrom, pos, float(np.clip(RNG.normal(0.006, 0.004), 0, 0.05)), 30, "CHH"))
-    # chrY CpGs for sex inference
+    # chrX CpGs: copy-number depth by sex (~1x autosome in XX, ~0.5x in XY) plus an
+    # X-inactivation methylation signal (higher in females) — drives infer_sex()
+    xcov = 30 if sex == "female" else 15
+    xmeth = 0.50 if sex == "female" else 0.35
+    for _ in range(300):
+        rec.append(("chrX", int(RNG.integers(3_000_000, 3_400_000)),
+                    float(np.clip(xmeth + RNG.normal(0, 0.05), 0, 1)), xcov, "CpG"))
+    # chrY CpGs (mis-mapping-prone; annotation only, not the sex decision)
     ycov = 28 if sex == "male" else 1
     for _ in range(200):
         rec.append(("chrY", int(RNG.integers(2_700_000, 2_800_000)),
