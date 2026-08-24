@@ -47,3 +47,19 @@ Either two haplotype methylation files (`--hp1/--hp2`, any supported per-cytosin
 format — e.g. `modkit pileup --partition-tag HP`), or a long allele table
 (`--allele-table`) with columns `chrom,pos,allele,meth,cov`. `--candidate <file>`
 runs the single-sample heuristic scan (flags loci to confirm by phasing).
+
+## Build scripts (bin/) — produce the real references into _local/refs/
+
+Both pull authoritative values (not fabricated) and map to GRCh38 via the 450K/EPIC
+minfi annotation + the on-disk UCSC chain (`bin/probe_hg38_map.R`); run in an R env
+with the Bioconductor packages (see `env/`):
+
+- **Cell-type reference** — `Rscript bin/prepare_salas_reference.R blood _local/refs/salas_blood6_hg38.tsv`
+  builds the Salas/IDOL 6-cell blood reference (`FlowSorted.Blood.EPIC`); pass
+  `extended` for the 12-cell panel where `FlowSorted.BloodExtended.EPIC` is available.
+- **Clocks** — `Rscript bin/prepare_clocks.R` builds Horvath2013, HorvathSkinBlood2018,
+  Hannum2013, PhenoAge2018, PedBE2019 (pediatric) and Zhang2019 from `dnaMethyAge`
+  into `_local/refs/clocks/` (+ `manifest.tsv`), each as probe- and hg38-keyed TSVs.
+
+Generated files live under `_local/refs/` (gitignored reference data); the scripts +
+this doc are the tracked, reproducible source.
