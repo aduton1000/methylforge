@@ -136,18 +136,57 @@ def methylation_qc(meth: pd.DataFrame, gates: dict | None = None,
     return metrics
 
 
-def _infer_sex(cpg: pd.DataFrame) -> str:
-    """Rough sex inference from chrY coverage relative to autosomes."""
-    chrom = cpg.chrom.str.replace("chr", "", regex=False)
+def infer_sex(cpg: pd.DataFrame) -> dict:
+    """Methylation-based sex inference robust to the chrY mis-mapping and coverage
+    bias that break a naive chrY-coverage ratio (reads pile onto chrY PARs/repeats
+    in females, and CpG-island over-coverage skews mean depth).
+
+    The decision uses the chrX:autosome depth ratio — a copy-number signal (~0.5 in
+    XY, ~1.0 in XX) that is independent of the methylation level — with the boundary
+    at 0.70. The chrX X-inactivation methylation ratio and the chrY depth ratio are
+    reported as supporting annotations (their absolute values drift between
+    datasets, so they inform confidence rather than the call).
+
+    Returns {sex, confidence, x_depth_ratio, xci_ratio, y_depth_ratio, detail}."""
+    chrom = cpg.chrom.astype(str).str.replace("chr", "", regex=False)
     auto = cpg[chrom.isin([str(i) for i in range(1, 23)])]
-    y = cpg[chrom == "Y"]
-    if len(auto) == 0:
-        return "unknown"
-    auto_cov = auto['cov'].mean()
-    y_cov = y['cov'].mean() if len(y) else 0.0
-    ratio = (y_cov / auto_cov) if auto_cov else 0.0
-    if ratio >= 0.15:
-        return f"male (chrY/auto coverage ratio {ratio:.2f})"
-    if ratio < 0.05:
-        return f"female (chrY/auto coverage ratio {ratio:.2f})"
-    return f"indeterminate (chrY/auto coverage ratio {ratio:.2f})"
+    X = cpg[chrom == "X"]
+    Y = cpg[chrom == "Y"]
+    none = dict(sex="unknown", confidence="low", x_depth_ratio=None,
+                xci_ratio=None, y_depth_ratio=None, detail="insufficient chrX/autosome coverage")
+    if len(auto) == 0 or len(X) == 0:
+        return none
+    dA = float(auto['cov'].mean())
+    if dA <= 0:
+        return none
+    x_ratio = float(X['cov'].mean()) / dA
+    y_ratio = (float(Y['cov'].mean()) / dA) if len(Y) else 0.0
+    mA = float(np.nansum(auto.meth) / max(np.nansum(auto['cov']), 1))
+    mX = float(np.nansum(X.meth) / max(np.nansum(X['cov']), 1))
+    xci = (mX / mA) if mA > 0 else float("nan")
+
+    BOUND = 0.70                      # midpoint of the ~0.5 (XY) / ~1.0 (XX) copy-number signal
+    sex = "female" if x_ratio >= BOUND else "male"
+    margin = abs(x_ratio - BOUND)
+    confidence = "high" if margin >= 0.10 else ("medium" if margin >= 0.04 else "low")
+    # XCI is expected to agree in direction (female > male chrX methylation); if it
+    # contradicts strongly, downgrade confidence and flag for review.
+    if xci == xci:
+        xci_female = xci >= 1.0
+        if (sex == "female") != xci_female and confidence != "low":
+            confidence = "review (chrX-depth vs X-inactivation disagree)"
+    return dict(sex=sex, confidence=confidence,
+                x_depth_ratio=round(x_ratio, 3),
+                xci_ratio=round(xci, 3) if xci == xci else None,
+                y_depth_ratio=round(y_ratio, 3),
+                detail=f"chrX:auto depth {x_ratio:.2f} (~0.5 XY / ~1.0 XX); "
+                       f"X-inactivation methylation ratio {xci:.2f}; chrY:auto depth {y_ratio:.2f}")
+
+
+def _infer_sex(cpg: pd.DataFrame) -> str:
+    """String summary of infer_sex() for reports/back-compat."""
+    r = infer_sex(cpg)
+    if r["sex"] == "unknown":
+        return "unknown (insufficient chrX/autosome coverage)"
+    return (f"{r['sex']} (chrX:auto depth {r['x_depth_ratio']}, "
+            f"XCI ratio {r['xci_ratio']}, {r['confidence']} confidence)")
