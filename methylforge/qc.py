@@ -20,6 +20,21 @@ DEFAULT_GATES = dict(
     min_puc19_meth=0.95,      # methylated-control retention (1 - over-conversion)
 )
 
+# Preset for low-pass / shallow WGBS-EM (e.g. ~3-8x): the 10x mean-coverage gate is
+# too strict and would fail otherwise-usable shallow data. Coverage thresholds are
+# relaxed while the conversion / over-conversion gates (which do not depend on depth)
+# are unchanged — pair this with region-level (DMR) rather than single-CpG analysis.
+LOWPASS_GATES = dict(DEFAULT_GATES, min_mean_cov=4.0, min_site_cov=3)
+
+
+def gates_for(profile: str = "standard", **overrides) -> dict:
+    """Return a QC gate set. profile: 'standard' (default) or 'low-pass'. Any
+    keyword override (e.g. min_mean_cov=6) wins; None values are ignored so CLI
+    flags can be passed through unconditionally."""
+    base = dict(LOWPASS_GATES if profile in ("low-pass", "lowpass", "shallow") else DEFAULT_GATES)
+    base.update({k: v for k, v in overrides.items() if v is not None})
+    return base
+
 # spike-in contig names auto-detected in the methylation calls (case-insensitive,
 # prefix match) — covers the downloaded accessions and common aliases.
 DEFAULT_SPIKEIN = dict(

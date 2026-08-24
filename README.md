@@ -105,6 +105,18 @@ Per sample under `--outdir`: `qc/`, `align/`, `methylation/`, and `report/` with
 - **Spike-ins** — append lambda + pUC19 to the reference with `bin/prepare_reference.sh` to measure conversion from the data.
 - **EPIC manifest** — supplied by you (licensed); `bin/epic_process.R` derives coordinates via minfi/sesame (+ optional hg19→hg38 liftOver via `--array_chain`).
 
+## Case/cohort stages (v0.2)
+
+Native stages for small case/control and family/twin designs, where cell composition, age and sex confound a naïve contrast. Each is a standalone subcommand and is also wired into `run`:
+
+- **Cell-type deconvolution** — `methylforge deconvolve --reference <ref.tsv> <sample>` (or `--matrix`): estimate blood/tissue composition (`CP`/`RPC`), reported as a result and usable as a DMR covariate. `run --cell-reference`.
+- **Covariate-adjusted / paired DMR** — `methylforge dmr --covariates <covs.tsv> --pair <pairs.tsv> --autosomes`: OLS on M-values `M ~ group + covariates (+ pair block)`, so sex/age/composition are adjusted out and a twin pair is modelled as a block. `--autosomes` drops chrX/Y/M (essential for mixed-sex contrasts). `run --dmr-covariates/--dmr-pairs/--dmr-autosomes`.
+- **Epigenetic clocks** — `methylforge clock <sample> --clock Horvath=<coef.tsv> --chrono-age <yrs>`: DNAm age & acceleration (additive + Horvath transform), intrinsic vs extrinsic via composition. `run --clock/--chrono-age`.
+- **Allele-specific methylation** — `methylforge asm --hp1 <hp1> --hp2 <hp2>` (or `--allele-table`, or `--candidate <sample>` for the single-sample heuristic scan). `run --asm-hp1/--asm-hp2`.
+- **Differential variability** — `methylforge dvp --matrix <m> --groups <g>` (iEVORA-style DVPs).
+- **Sample-identity / swap QC** — `methylforge identity --matrix <m>` (or `--samplesheet`, `--sex-check`, `--expected-pairs A:B`): correlation-based swap/duplicate detection + methylation-based sex.
+- **Low-pass QC** — `methylforge qc <sample> --low-pass` relaxes coverage gates for shallow WGBS/EM (~3–8×); `run --low-pass`. Pair with region-level (DMR) analysis. Reference/coefficient formats: `methylforge/resources/README_references.md`.
+
 ## Documentation
 
 The full **[User Manual](docs/manual/methylforge_manual.pdf)** ([Markdown source](docs/manual/methylforge_manual.md)) documents every concept, stage, input schema, reference, configuration knob, and troubleshooting note. Build it with `pandoc metadata.yaml methylforge_manual.md -o methylforge_manual.pdf --pdf-engine=xelatex --toc --number-sections`.
