@@ -34,18 +34,39 @@ def build_centroids(ref_matrix: pd.DataFrame, labels: dict) -> pd.DataFrame:
     return pd.DataFrame(cols)
 
 
+# SVM probability calibration is unreliable with few samples per class; below this
+# the deterministic nearest-centroid backend is used instead (consistent results
+# whether or not scikit-learn happens to be installed).
+MIN_SVM_PER_CLASS = 10
+
+
 def _try_sklearn(ref_matrix, labels, query):
     try:
         from sklearn.svm import SVC
     except Exception:
         return None
+    from collections import Counter
     samples = [s for s in ref_matrix.columns if s in labels]
-    X = ref_matrix[samples].T.to_numpy(float)
     y = [labels[s] for s in samples]
-    clf = SVC(kernel="linear", probability=True).fit(X, y)
-    q = query.reindex(ref_matrix.index).to_numpy(float).reshape(1, -1)
-    proba = clf.predict_proba(q)[0]
-    return dict(zip(clf.classes_, proba))
+    counts = Counter(y)
+    if len(counts) < 2 or min(counts.values()) < MIN_SVM_PER_CLASS:
+        return None   # too few per class for a trustworthy SVM -> nearest-centroid fallback
+    q = query.reindex(ref_matrix.index).to_numpy(float)
+    mask = ~np.isnan(q)
+    if mask.sum() == 0:
+        return None
+    X = ref_matrix[samples].to_numpy(float).T[:, mask]
+    # decision_function + softmax (no deprecated probability=True; works on sklearn >=1.11)
+    clf = SVC(kernel="linear", decision_function_shape="ovr").fit(X, y)
+    dec = np.asarray(clf.decision_function(q[mask].reshape(1, -1)))[0]
+    classes = list(clf.classes_)
+    if np.ndim(dec) == 0 or len(classes) == 2:      # binary: scalar margin -> two logits
+        d = np.array([-float(dec), float(dec)])
+    else:
+        d = np.asarray(dec, float)
+    z = d - d.max()
+    pr = np.exp(z) / np.exp(z).sum()
+    return {str(c): float(v) for c, v in zip(classes, pr)}
 
 
 def classify(query: pd.Series, centroids: pd.DataFrame,

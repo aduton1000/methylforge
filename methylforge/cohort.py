@@ -51,7 +51,8 @@ def _in_regions(chroms: np.ndarray, starts: np.ndarray, bed: pd.DataFrame) -> np
 
 
 def build_matrix(sample_paths: dict, min_cov: int = 5, min_samples_frac: float = 0.75,
-                 sites=None, region_bed: str | None = None, context: str = "CpG") -> pd.DataFrame:
+                 sites=None, region_bed: str | None = None, context: str = "CpG",
+                 autosomes_only: bool = False) -> pd.DataFrame:
     bed = _load_bed(region_bed) if region_bed else None
     per = {}
     for name, path in sample_paths.items():
@@ -68,6 +69,9 @@ def build_matrix(sample_paths: dict, min_cov: int = 5, min_samples_frac: float =
     n = mat.shape[1]
     min_n = max(1, math.ceil(min_samples_frac * n))
     mat = mat[mat.notna().sum(axis=1) >= min_n]
+    if autosomes_only and len(mat):
+        chrom = mat.index.astype(str).str.split(":").str[0].str.replace("chr", "", regex=False)
+        mat = mat[~chrom.isin({"X", "Y", "M", "MT"})]
     mat.index.name = "feature"
     return mat.round(4)
 

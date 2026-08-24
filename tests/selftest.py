@@ -9,7 +9,8 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from methylforge import testdata, io as eio, qc as eqc, imprinting as eimp, \
     dmr as edmr, episignature as eepi, pipeline as epipe, export_familyforge as effx, \
-    cohort as ecoh, array as earr
+    cohort as ecoh, array as earr, deconvolve as edc, clocks as eclk, asm as easm, \
+    variability as evar, identity as eid
 
 
 def test_all():
@@ -80,6 +81,59 @@ def test_all():
     imp_arr = eimp.analyse_imprinting(eio.read_methylation(mp))
     assert imp_arr[imp_arr.locus == "PWS/AS-IC"].iloc[0]["call"] == "hypermethylation", \
         "array PWS sample should flag SNRPN hypermethylation"
+
+    # ── v0.2 native stages ──────────────────────────────────────────────────
+    def _q(path):
+        m = eio.read_methylation(path)
+        return pd.Series({f"{c}:{s}": b for c, s, b in zip(m.chrom, m.start, m.beta)})
+
+    # cell-type deconvolution — recover known mixture proportions (CP and RPC run)
+    dref = edc.load_reference(d["cell_reference"])
+    props = edc.deconvolve(_q(d["mixture"]), dref, method="CP")["proportions"]
+    for ct, truth in d["true_proportions"].items():
+        assert abs(props[ct] - truth) < 0.1, f"deconvolution off for {ct}: {props}"
+    assert edc.deconvolve(_q(d["mixture"]), dref, method="RPC")["proportions"]  # RPC path runs
+
+    # epigenetic clock — finite age, most features found
+    ck = eclk.load_clock(d["clock"])
+    age = eclk.predict_age(_q(d["samples"]["sotos_case"]), ck)
+    assert age["dnam_age"] == age["dnam_age"] and age["frac_missing"] < 0.5, age
+    assert len(eclk.cohort_acceleration([50, 60, 70], [45, 60, 75])) == 3
+
+    # ASM — recover the implanted chr20 region, null region excluded
+    hp1, hp2 = easm.load_pair(d["hp1"], d["hp2"])
+    asites = easm.asm_from_haplotypes(hp1, hp2, min_cov=5)
+    aregions = easm.merge_asm_regions(asites)
+    assert len(aregions) >= 1 and (aregions.chrom == "chr20").any(), "expected a chr20 ASM region"
+    assert (asites[asites.asm].pos < 5_500_000).all(), "ASM should be confined to the implanted region"
+    assert (easm.candidate_asm_scan(hp1, min_cov=5, min_sites=4).chrom == "chr20").any()
+
+    # differential variability (DVP) — runs and returns the schema
+    dvps = evar.call_dvps(mat, groups)
+    assert "dvp" in dvps.columns and "log2_var_ratio" in dvps.columns
+
+    # covariate-adjusted & paired DMR — still recover the implanted DMR
+    cov = pd.read_csv(d["dmr_covariates"], sep="\t").set_index("sample")
+    pdf = pd.read_csv(d["dmr_pairs"], sep="\t"); pair = dict(zip(pdf.iloc[:, 0], pdf.iloc[:, 1]))
+    dmrs_cov = edmr.merge_dmrs(edmr.call_dmps_glm(mat, groups, covariates=cov))
+    assert (dmrs_cov.direction == "hyper").any(), "covariate DMR should recover the implanted DMR"
+    assert len(edmr.merge_dmrs(edmr.call_dmps_glm(mat, groups, pair=pair))) >= 1, "paired DMR runs"
+
+    # identity — detect an implanted duplicate column
+    swapped = cmat.copy(); swapped["dupctrl"] = cmat["ctrl1"]
+    dups = eid.flag_duplicates(eid.correlation_matrix(swapped))
+    assert any("dupctrl" in (x, y) and "ctrl1" in (x, y) for x, y, _ in dups), "duplicate not detected"
+
+    # config fix 1 — low-pass gates accept shallow coverage the default rejects
+    shallow = pd.DataFrame({"chrom": ["chr1"] * 1200, "start": range(1200), "end": range(1, 1201),
+                            "context": ["CpG"] * 1200, "meth": [3] * 1200, "cov": [5] * 1200,
+                            "beta": [0.6] * 1200})
+    assert not eqc.methylation_qc(shallow)["checks"]["coverage"], "5x should fail the standard gate"
+    assert eqc.methylation_qc(shallow, gates=eqc.gates_for("low-pass"))["checks"]["coverage"], \
+        "5x should pass the low-pass gate"
+    # config fix 2 — autosomes-only drops chrX/Y
+    tiny = pd.DataFrame({"case1": [0.9, 0.1], "ctrl1": [0.1, 0.1]}, index=["chr1:100", "chrX:200"])
+    assert edmr.restrict_autosomes(tiny).index.tolist() == ["chr1:100"]
 
     # end-to-end + FamilyForge export
     res = epipe.run(d["samples"]["pws_case"], "selftest", os.path.join(tmp, "out"),
