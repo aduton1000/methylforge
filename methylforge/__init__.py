@@ -10,5 +10,6 @@ The analysis + report engine is pure-Python (numpy/pandas/scipy/matplotlib/jinja
 so it runs anywhere; the upstream alignment/extraction stages are Nextflow modules
 that call the standard tools (Bismark/bwa-meth/MethylDackel, dorado/minimap2/modkit).
 """
-__version__ = "0.1.0"
-__all__ = ["io", "qc", "imprinting", "dmr", "episignature", "annotate", "plots", "report", "pipeline"]
+__version__ = "0.2.0"
+__all__ = ["io", "qc", "imprinting", "dmr", "episignature", "annotate", "plots", "report",
+           "pipeline", "deconvolve", "clocks", "asm", "variability", "identity"]

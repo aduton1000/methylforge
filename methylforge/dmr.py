@@ -108,6 +108,125 @@ def _finalise_dmr(chrom, direction, buf):
                 min_qvalue=float(rows.qvalue.min()))
 
 
+SEX_CHROMS = {"X", "Y", "M", "MT", "chrX", "chrY", "chrM", "chrMT"}
+
+
+def restrict_autosomes(matrix: pd.DataFrame) -> pd.DataFrame:
+    """Drop chrX/chrY/chrM rows from a feature x sample matrix (index 'chrom:pos').
+    Essential before an affected-vs-unaffected contrast on mixed-sex samples, where
+    X-inactivation otherwise dominates the result."""
+    chrom = matrix.index.astype(str).str.split(":").str[0].str.replace("chr", "", regex=False)
+    return matrix[~chrom.isin({"X", "Y", "M", "MT"})]
+
+
+def _build_design(samples, groups, covariates=None, pair=None):
+    """Design matrix for the covariate/paired DMR model: intercept + group(case=1)
+    + numeric/one-hot covariates + one-hot pair(block) effects. Returns
+    (X DataFrame indexed by sample, name of the group column)."""
+    X = pd.DataFrame(index=list(samples))
+    X["(Intercept)"] = 1.0
+    X["group"] = [1.0 if groups.get(s) == "case" else 0.0 for s in samples]
+    if covariates is not None:
+        cov = covariates.reindex(samples)
+        for c in cov.columns:
+            col = cov[c]
+            if pd.api.types.is_numeric_dtype(col):
+                X[c] = col.astype(float).to_numpy()
+            else:
+                d = pd.get_dummies(col.astype(str), prefix=c, drop_first=True)
+                for dc in d.columns:
+                    X[dc] = d[dc].astype(float).to_numpy()
+    if pair is not None:
+        ps = pd.Series({s: str(pair.get(s, "NA")) for s in samples}).reindex(samples)
+        d = pd.get_dummies(ps, prefix="pair", drop_first=True)
+        for dc in d.columns:
+            X[dc] = d[dc].astype(float).to_numpy()
+    return X, "group"
+
+
+def call_dmps_glm(matrix: pd.DataFrame, groups: dict, covariates: pd.DataFrame | None = None,
+                  pair: dict | None = None, min_delta=0.10, fdr=0.05) -> pd.DataFrame:
+    """Covariate-adjusted / paired differential methylation. Fits, per CpG, an OLS
+    on M-values:  M ~ group + covariates (+ pair block), and tests the group
+    coefficient — so sex, age and cell-composition can be adjusted out, and a twin
+    pair can be modelled as a block. Output schema matches `call_dmps` (so
+    `merge_dmrs` applies). Δβ is reported in beta space for interpretability.
+
+    covariates: a samples x covariates DataFrame (numeric or categorical).
+    pair: {sample: pair_id} fixed-effect blocking (e.g. twin/family)."""
+    samples = [s for s in matrix.columns if s in groups]
+    cases = [s for s in samples if groups[s] == "case"]
+    ctrls = [s for s in samples if groups[s] == "control"]
+    if not cases or not ctrls:
+        raise ValueError("need >=1 case and >=1 control sample present in the matrix")
+    X, gcol = _build_design(samples, groups, covariates, pair)
+    Xmat = X.to_numpy(float)
+    gidx = list(X.columns).index(gcol)
+    p = Xmat.shape[1]
+
+    C = matrix[cases].to_numpy(float)
+    K = matrix[ctrls].to_numpy(float)
+    delta = np.nanmean(C, axis=1) - np.nanmean(K, axis=1)
+    Y = _mvalue(matrix[samples].to_numpy(float))   # sites x samples (may contain NaN)
+    nsite = Y.shape[0]
+    pvals = np.ones(nsite)
+    coefs = np.zeros(nsite)
+
+    complete = ~np.isnan(Y).any(axis=1)
+    # Fast vectorised path for rows with no missing samples
+    if complete.any() and Xmat.shape[0] - p > 0:
+        try:
+            XtX_inv = np.linalg.inv(Xmat.T @ Xmat)
+            H = XtX_inv @ Xmat.T                       # p x n
+            Yc = Y[complete]                           # m x n
+            B = Yc @ H.T                               # m x p
+            resid = Yc - B @ Xmat.T                    # m x n
+            dof = Xmat.shape[0] - p
+            sigma2 = (resid ** 2).sum(axis=1) / dof
+            se = np.sqrt(sigma2 * XtX_inv[gidx, gidx])
+            with np.errstate(divide="ignore", invalid="ignore"):
+                t = np.where(se > 0, B[:, gidx] / se, 0.0)
+            pc = 2 * stats.t.sf(np.abs(t), dof)
+            idx = np.where(complete)[0]
+            pvals[idx] = np.where(se > 0, pc, 1.0)
+            coefs[idx] = B[:, gidx]
+        except np.linalg.LinAlgError:
+            complete[:] = False   # fall through to per-row loop
+    # Per-row path for rows with missing data
+    for i in np.where(~complete)[0]:
+        yi = Y[i]
+        ok = ~np.isnan(yi)
+        if ok.sum() - p <= 0:
+            continue
+        Xi = Xmat[ok]
+        try:
+            XtX_inv = np.linalg.inv(Xi.T @ Xi)
+        except np.linalg.LinAlgError:
+            continue
+        beta = XtX_inv @ Xi.T @ yi[ok]
+        resid = yi[ok] - Xi @ beta
+        dof = ok.sum() - p
+        sigma2 = float(resid @ resid) / dof
+        se = np.sqrt(sigma2 * XtX_inv[gidx, gidx])
+        if se > 0:
+            tval = beta[gidx] / se
+            pvals[i] = 2 * stats.t.sf(abs(tval), dof)
+            coefs[i] = beta[gidx]
+
+    q = _bh_fdr(pvals)
+    out = pd.DataFrame({
+        "site": matrix.index, "delta": np.round(delta, 4),
+        "coef_M": np.round(coefs, 4),
+        "case_mean": np.round(np.nanmean(C, axis=1), 4),
+        "control_mean": np.round(np.nanmean(K, axis=1), 4),
+        "pvalue": pvals, "qvalue": np.round(q, 5)})
+    out["chrom"] = out.site.astype(str).str.split(":").str[0]
+    out["pos"] = out.site.astype(str).str.split(":").str[1].astype(int)
+    out["dmp"] = (np.abs(out.delta) >= min_delta) & (out.qvalue <= fdr)
+    out["direction"] = np.where(out.delta > 0, "hyper", "hypo")
+    return out.sort_values(["chrom", "pos"]).reset_index(drop=True)
+
+
 def summarise_dmr(dmps: pd.DataFrame, dmrs: pd.DataFrame) -> dict:
     n_dmp = int(dmps.dmp.sum())
     n_dmr = int(len(dmrs))

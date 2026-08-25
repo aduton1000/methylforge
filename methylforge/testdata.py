@@ -91,7 +91,14 @@ def _sample_records(imprint_overrides: dict, epi_class: str, ref_centroids, feat
         chrom = f"chr{RNG.integers(1, 23)}"
         pos = int(RNG.integers(4_000_000, 4_200_000))
         rec.append((chrom, pos, float(np.clip(RNG.normal(0.006, 0.004), 0, 0.05)), 30, "CHH"))
-    # chrY CpGs for sex inference
+    # chrX CpGs: copy-number depth by sex (~1x autosome in XX, ~0.5x in XY) plus an
+    # X-inactivation methylation signal (higher in females) — drives infer_sex()
+    xcov = 30 if sex == "female" else 15
+    xmeth = 0.50 if sex == "female" else 0.35
+    for _ in range(300):
+        rec.append(("chrX", int(RNG.integers(3_000_000, 3_400_000)),
+                    float(np.clip(xmeth + RNG.normal(0, 0.05), 0, 1)), xcov, "CpG"))
+    # chrY CpGs (mis-mapping-prone; annotation only, not the sex decision)
     ycov = 28 if sex == "male" else 1
     for _ in range(200):
         rec.append(("chrY", int(RNG.integers(2_700_000, 2_800_000)),
@@ -208,6 +215,70 @@ def generate_array(data_dir: str, centroids: dict, feats: list) -> dict:
                 manifest=os.path.join(data_dir, "epic_manifest.tsv"))
 
 
+def generate_extras(data: str, feats: list) -> dict:
+    """Fixtures for the v0.2 stages: a cell-type reference + a mixture with known
+    proportions (deconvolution), a clock coefficient table (clocks), a haplotype
+    methylation pair with one implanted ASM region (ASM), and covariate/pair
+    tables for the covariate-adjusted / paired DMR model."""
+    rng = np.random.default_rng(2026)
+    cells = ["CellA", "CellB", "CellC"]
+    markers = [f"chr9:{100000 + i * 300}" for i in range(120)]
+    ref = pd.DataFrame(index=markers, columns=cells, dtype=float)
+    for i, m in enumerate(markers):
+        vals = [0.1, 0.1, 0.1]; vals[i % 3] = 0.9
+        ref.loc[m] = vals
+    ref.index.name = "feature"
+    ref.round(4).to_csv(os.path.join(data, "cell_reference.tsv"), sep="\t")
+    true_prop = {"CellA": 0.6, "CellB": 0.3, "CellC": 0.1}
+    w = np.array([true_prop[c] for c in cells])
+    mix = []
+    for m in markers:
+        c, p = m.split(":")
+        beta = float(np.clip(ref.loc[m].to_numpy(float) @ w + rng.normal(0, 0.01), 0, 1))
+        mix.append((c, int(p), beta, 30, "CpG"))
+    _write_native(mix, os.path.join(data, "mixture_sample.methyl.tsv"))
+
+    # clock over features present in every sample (episignature CpGs)
+    cfeat = list(feats[:30])
+    clk = pd.DataFrame({"feature": ["(Intercept)"] + cfeat,
+                        "coefficient": [30.0] + list(np.round(rng.normal(0, 0.5, len(cfeat)), 4)),
+                        "mean": [np.nan] + [0.5] * len(cfeat)})
+    clk.to_csv(os.path.join(data, "clock_demo.tsv"), sep="\t", index=False)
+
+    # haplotype pair: chr20 ASM region (hp1 hyper) + a null intermediate region
+    hp1, hp2 = [], []
+    for i in range(10):
+        pos = 5_000_000 + i * 50
+        hp1.append(("chr20", pos, float(np.clip(0.9 + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
+        hp2.append(("chr20", pos, float(np.clip(0.1 + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
+    for i in range(10):
+        pos = 6_000_000 + i * 50
+        hp1.append(("chr20", pos, float(np.clip(0.5 + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
+        hp2.append(("chr20", pos, float(np.clip(0.5 + rng.normal(0, 0.03), 0, 1)), 30, "CpG"))
+    _write_native(hp1, os.path.join(data, "hp1.methyl.tsv"))
+    _write_native(hp2, os.path.join(data, "hp2.methyl.tsv"))
+
+    # covariates + pairs for the cohort DMR matrix (case1..6 / ctrl1..6)
+    cases = [f"case{i+1}" for i in range(6)]; ctrls = [f"ctrl{i+1}" for i in range(6)]
+    samples = cases + ctrls
+    pd.DataFrame({"sample": samples,
+                  "age": np.round(rng.uniform(20, 60, len(samples)), 1),
+                  "sex": rng.choice(["M", "F"], len(samples))}).to_csv(
+        os.path.join(data, "dmr_covariates.tsv"), sep="\t", index=False)
+    pd.DataFrame({"sample": samples,
+                  "pair": [f"p{i+1}" for i in range(6)] * 2}).to_csv(
+        os.path.join(data, "dmr_pairs.tsv"), sep="\t", index=False)
+
+    return dict(cell_reference=os.path.join(data, "cell_reference.tsv"),
+                mixture=os.path.join(data, "mixture_sample.methyl.tsv"),
+                true_proportions=true_prop,
+                clock=os.path.join(data, "clock_demo.tsv"),
+                hp1=os.path.join(data, "hp1.methyl.tsv"),
+                hp2=os.path.join(data, "hp2.methyl.tsv"),
+                dmr_covariates=os.path.join(data, "dmr_covariates.tsv"),
+                dmr_pairs=os.path.join(data, "dmr_pairs.tsv"))
+
+
 def generate(outdir: str) -> dict:
     os.makedirs(outdir, exist_ok=True)
     data = os.path.join(outdir, "data")
@@ -262,6 +333,7 @@ def generate(outdir: str) -> dict:
 
     cohort = generate_cohort(data)
     array = generate_array(data, centroids, feats)
+    extras = generate_extras(data, feats)
 
     print(f"[methylforge] test data written to {data}")
     for n, p in paths.items():
@@ -274,7 +346,7 @@ def generate(outdir: str) -> dict:
                 episig_labels=os.path.join(data, "episig_labels.tsv"),
                 dmr_matrix=os.path.join(data, "dmr_matrix.tsv"),
                 dmr_groups=os.path.join(data, "dmr_groups.tsv"),
-                genes_bed=os.path.join(data, "genes.bed"))
+                genes_bed=os.path.join(data, "genes.bed"), **extras)
 
 
 if __name__ == "__main__":
