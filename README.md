@@ -1,10 +1,17 @@
-# MethylForge
+<!-- banner -->
+![MethylForge](assets/banner.png)
 
-**A reproducible Nextflow + Python pipeline for epigenome (DNA-methylation) analysis — from short- or long-read methylation data (or arrays) to imprinting-disorder calls, episignature classification, differential-methylation regions, and branded clinical / research reports.**
+<p align="center">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-2b7bb9">
+  <img alt="nextflow" src="https://img.shields.io/badge/Nextflow-DSL2%20%E2%89%A523.10-0DC09D?logo=nextflow&logoColor=white">
+  <img alt="python" src="https://img.shields.io/badge/CLI-Python%203.10%2B-3776AB?logo=python&logoColor=white">
+  <img alt="platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS-8A6D1C">
+  <img alt="status" src="https://img.shields.io/badge/status-research-9E2B25">
+</p>
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Nextflow](https://img.shields.io/badge/Nextflow-DSL2%20%E2%89%A523.10-23aa62.svg)
-![Python](https://img.shields.io/badge/CLI-Python%20%E2%89%A53.10-3776ab.svg)
+<p align="center"><b>A reproducible Nextflow + Python pipeline for epigenome (DNA-methylation) analysis —<br>from short- or long-read methylation data (or arrays) to imprinting-disorder calls, episignature classification, differential-methylation regions, and branded clinical / research reports.</b></p>
+
+---
 
 MethylForge is the **epigenome** counterpart to [CallForge](https://github.com/aduton1000/callforge) (sequence variants) and [FamilyForge](https://github.com/aduton1000/familyforge) (interpretation). It is **organism- and disease-agnostic**: change inputs and config, never code. Every input — bisulfite/EM-seq, long-read native 5mC, pre-called methylation, or Illumina EPIC/450K arrays — is normalised to a single per-cytosine schema, so all downstream analysis is caller-agnostic.
 
@@ -23,6 +30,23 @@ DNA methylation (a methyl group on cytosine, almost always at **CpG** sites) is 
 - **FamilyForge interoperability** — every run emits a `candidates.json`-compatible findings file and a tolerant TSV that FamilyForge can ingest for downstream interpretation/reporting.
 
 ## Pipeline architecture
+
+```mermaid
+flowchart LR
+  SR[short-read<br/>bisulfite · EM-seq] --> M[normalised<br/>per-CpG methylation]
+  LR[long-read<br/>native 5mC] --> M
+  PC[pre-called<br/>bedMethyl · .cov] --> M
+  AR[EPIC · 450K<br/>arrays] --> M
+  M --> QC[methylation QC]
+  M --> IMP[imprinting-disorder]
+  M --> EPI[episignature]
+  M --> DMR[differential methylation]
+  QC --> REP[clinical + research reports]
+  IMP --> REP
+  EPI --> REP
+  DMR --> REP
+  REP --> FF[FamilyForge hand-off]
+```
 
 Two layers: a **Nextflow DSL2** layer (per-sample alignment/extraction + orchestration) and a **pure-Python** analysis + report engine (runs anywhere). Three modes selected with `--mode`: `sequencing` (default), `array`, `cohort_qc`.
 
