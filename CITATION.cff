@@ -13,10 +13,14 @@ abstract: >-
 authors:
   - family-names: "Adu"
     given-names: "Bright"
+    alias: "aduton1000"
+    orcid: "https://orcid.org/0000-0002-3622-2137"
     affiliation: "Genomics & Bioinformatics Core, Noguchi Memorial Institute for Medical Research, University of Ghana, Legon, Ghana"
 version: 0.1.0
+date-released: "2026-07-19"
 license: MIT
 type: software
+repository-code: "https://github.com/aduton1000/methylforge"
 keywords:
   - bioinformatics
   - DNA methylation
@@ -30,7 +34,9 @@ keywords:
 references:
   - type: software
     title: "CallForge: a targeted-capture germline analysis pipeline"
+    repository-code: "https://github.com/aduton1000/callforge"
     notes: "Sibling sequence-variant pipeline; MethylForge emits a FamilyForge-compatible findings hand-off that pairs with CallForge output."
   - type: software
-    title: "FamilyForge: family-based variant interpretation and reporting"
+    title: "FamilyForge: pedigree-aware Mendelian and ACMG-style interpretation of a family callset"
+    repository-code: "https://github.com/aduton1000/familyforge"
     notes: "Downstream interpretation layer that ingests MethylForge's candidates.json-compatible findings export."
